@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #0d1117; color: #c9d1d9; padding: 14px; margin: 0; font-size: 13px; }
+    .header { font-size: 15px; font-weight: bold; color: #58a6ff; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+    .badge { background: #238636; color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 4px; }
+    
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 12px; }
+    .btn-cat { background: #161b22; border: 1px solid #30363d; color: #8b949e; padding: 8px 4px; border-radius: 6px; cursor: pointer; text-align: center; font-size: 12px; font-weight: 500; user-select: none; }
+    .btn-cat.active { background: #1f6feb; border-color: #58a6ff; color: #ffffff; }
+
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 12px; margin-bottom: 12px; }
+    .form-group { margin-bottom: 10px; }
+    label { display: block; margin-bottom: 4px; color: #8b949e; font-size: 11px; }
+    input, select { width: 100%; background: #0d1117; border: 1px solid #30363d; color: #f0f6fc; padding: 7px; border-radius: 4px; outline: none; font-size: 13px; }
+    input:focus, select:focus { border-color: #58a6ff; }
+    
+    .ext-btn { display: inline-block; background: #21262d; border: 1px solid #30363d; color: #58a6ff; font-size: 11px; padding: 4px 8px; border-radius: 4px; text-decoration: none; margin-right: 4px; }
+    .ext-btn:hover { background: #30363d; color: #79c0ff; border-color: #58a6ff; }
+    .calc-box { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 8px; margin-top: 6px; margin-bottom: 6px; }
+
+    .btn-submit { width: 100%; background: #238636; border: none; color: #fff; padding: 10px; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; margin-top: 4px; }
+    .btn-submit:hover { background: #2ea043; }
+    .status { text-align: center; font-size: 11px; margin-top: 8px; color: #8b949e; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <span>⚡ 四維資產即時調度器</span>
+    <span class="badge">即時連動</span>
+  </div>
+
+  <div class="grid">
+    <div id="cat-DIVIDEND" class="btn-cat active" onclick="switchTab('DIVIDEND')">💰 股息入帳</div>
+    <div id="cat-INFLOW" class="btn-cat" onclick="switchTab('INFLOW')">📥 外部注入</div>
+    <div id="cat-PLEDGE" class="btn-cat" onclick="switchTab('PLEDGE')">📈 質押借還</div>
+    <div id="cat-FUTURES" class="btn-cat" onclick="switchTab('FUTURES')">🎯 期貨出入</div>
+    <div id="cat-LOAN" class="btn-cat" onclick="switchTab('LOAN')">💸 貸款扣繳</div>
+    <div id="cat-STOCK" class="btn-cat" onclick="switchTab('STOCK')">🛒 現貨買賣</div>
+  </div>
+
+  <div class="card">
+    <div id="dynamic-fields"></div>
+    <button class="btn-submit" onclick="submitDispatch()">🚀 執行資金調度</button>
+    <div class="status" id="status-msg">系統就緒</div>
+  </div>
+
+  <script>
+    var currentCat = 'DIVIDEND';
+    var initData = { pledges: [], loans: [], stocks: [] };
+
+    function playTone(type) {
+      try {
+        var AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        var ctx = new AudioContext();
+
+        if (type === 'success') {
+          var osc1 = ctx.createOscillator();
+          var osc2 = ctx.createOscillator();
+          var gain = ctx.createGain();
+
+          osc1.type = 'sine';
+          osc2.type = 'sine';
+          osc1.frequency.setValueAtTime(880, ctx.currentTime);
+          osc2.frequency.setValueAtTime(1320, ctx.currentTime + 0.08);
+
+          gain.gain.setValueAtTime(0.15, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+
+          osc1.connect(gain);
+          osc2.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc1.start(ctx.currentTime);
+          osc1.stop(ctx.currentTime + 0.08);
+          osc2.start(ctx.currentTime + 0.08);
+          osc2.stop(ctx.currentTime + 0.25);
+        } else if (type === 'error') {
+          var osc = ctx.createOscillator();
+          var gain = ctx.createGain();
+
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(300, ctx.currentTime);
+          osc.frequency.setValueAtTime(200, ctx.currentTime + 0.1);
+
+          gain.gain.setValueAtTime(0.2, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.3);
+        }
+      } catch (e) {}
+    }
+
+    function switchTab(cat) {
+      currentCat = cat;
+      var buttons = document.querySelectorAll('.btn-cat');
+      for (var i = 0; i < buttons.length; i++) {
+        buttons[i].classList.remove('active');
+      }
+      var activeBtn = document.getElementById('cat-' + cat);
+      if (activeBtn) activeBtn.classList.add('active');
+      renderForm();
+    }
+
+    function renderForm() {
+      var container = document.getElementById('dynamic-fields');
+      var html = '';
+
+      if (currentCat === 'DIVIDEND') {
+        var stockOpts = '<option value="">-- 手動自訂輸入 --</option>';
+        if (initData.stocks && initData.stocks.length > 0) {
+          for (var i = 0; i < initData.stocks.length; i++) {
+            var s = initData.stocks[i];
+            stockOpts += '<option value="' + s.code + '" data-code="' + s.code + '" data-qty="' + (s.qty || 0) + '">' + (s.type === 'TW' ? '台' : '美') + ' - ' + s.code + ' ' + s.name + '</option>';
+          }
+        }
+
+        html += '<div class="form-group">' +
+                '  <label>選擇配息標的 (可快查/試算)：</label>' +
+                '  <select id="div-stock-select" onchange="onDividendStockChange()">' + stockOpts + '</select>' +
+                '</div>' +
+                '<div id="div-ext-link-box" style="display:none; margin-bottom:8px;">' +
+                '  <a id="div-ext-goodinfo" href="#" target="_blank" class="ext-btn">📊 Goodinfo 股利</a>' +
+                '  <a id="div-ext-wantgoo" href="#" target="_blank" class="ext-btn">📈 玩股網行情</a>' +
+                '</div>' +
+                '<div id="div-calc-box" class="calc-box" style="display:none;">' +
+                '  <div style="font-size:11px; color:#8b949e; margin-bottom:4px;">當前持有：<b id="div-stock-qty" style="color:#58a6ff;">0</b> 股</div>' +
+                '  <label style="font-size:11px;">每股配息金額 (元)：</label>' +
+                '  <input type="number" id="div-per-share" placeholder="例如：0.25" step="0.01" oninput="calcDividendTotal()">' +
+                '</div>' +
+                '<div class="form-group">' +
+                '  <label>實收配息入帳金額 (NTD)</label>' +
+                '  <input type="number" id="inp-amount" placeholder="例如：2850">' +
+                '</div>';
+
+      } else if (currentCat === 'INFLOW') {
+        html += '<div class="form-group">' +
+                '  <label>外部注入金額 (NTD)</label>' +
+                '  <input type="number" id="inp-amount" placeholder="例如：50000">' +
+                '</div>';
+
+      } else if (currentCat === 'PLEDGE') {
+        var pOpts = '';
+        if (initData.pledges && initData.pledges.length > 0) {
+          for (var j = 0; j < initData.pledges.length; j++) {
+            var p = initData.pledges[j];
+            pOpts += '<option value="' + p.row + '" data-pay="' + (p.defaultPay || 0) + '">' + p.name + '</option>';
+          }
+        } else {
+          pOpts = '<option value="5" data-pay="0">券商 - 統一證券質押</option>' +
+                  '<option value="6" data-pay="0">保單 - 國泰人壽借款</option>';
+        }
+
+        html += '<div class="form-group">' +
+                '  <label>質押 / 借款機構 (券商 / 保單 / 其他)</label>' +
+                '  <select id="inp-debt" onchange="updatePledgeAmount()">' + pOpts + '</select>' +
+                '</div>' +
+                '<div class="form-group">' +
+                '  <label>動作</label>' +
+                '  <select id="inp-action">' +
+                '    <option value="PLEDGE_BORROW">動用借款 (+現金/+負債)</option>' +
+                '    <option value="PLEDGE_REPAY">償還本金 (-現金/-負債)</option>' +
+                '  </select>' +
+                '</div>' +
+                '<div class="form-group">' +
+                '  <label>金額 (NTD)</label>' +
+                '  <input type="number" id="inp-amount" placeholder="輸入金額">' +
+                '</div>';
+
+      } else if (currentCat === 'FUTURES') {
+        html += '<div class="form-group">' +
+                '  <label>期貨市場</label>' +
+                '  <select id="inp-market">' +
+                '    <option value="TW">臺股期貨 (A11)</option>' +
+                '    <option value="US">海外期貨 (A25)</option>' +
+                '  </select>' +
+                '</div>' +
+                '<div class="form-group">' +
+                '  <label>動作</label>' +
+                '  <select id="inp-action">' +
+                '    <option value="FUTURES_IN">保證金補入 (-現金/+保證金)</option>' +
+                '    <option value="FUTURES_OUT">獲利出金 (+現金/-保證金)</option>' +
+                '  </select>' +
+                '</div>' +
+                '<div class="form-group">' +
+                '  <label>金額 (NTD)</label>' +
+                '  <input type="number" id="inp-amount" placeholder="輸入金額">' +
+                '</div>';
+
+      } else if (currentCat === 'LOAN') {
+        var lOpts = '';
+        if (initData.loans && initData.loans.length > 0) {
+          for (var k = 0; k < initData.loans.length; k++) {
+            var l = initData.loans[k];
+            lOpts += '<option value="' + l.row + '" data-pay="' + l.defaultPay + '">' + l.name + '</option>';
+          }
+        } else {
+          lOpts = '<option value="9">永豐銀行</option>';
+        }
+
+        html += '<div class="form-group">' +
+                '  <label>貸款項目 (信貸 / 房貸)</label>' +
+                '  <select id="inp-debt" onchange="updateLoanAmount()">' + lOpts + '</select>' +
+                '</div>' +
+                '<div class="form-group">' +
+                '  <label>扣繳金額 (NTD) - 同步增加已繳期數</label>' +
+                '  <input type="number" id="inp-amount" placeholder="輸入扣繳金額">' +
+                '</div>';
+
+      } else if (currentCat === 'STOCK') {
+        var sOpts = '<option value="">-- ➕ 手動輸入新標的代碼 --</option>';
+        if (initData.stocks && initData.stocks.length > 0) {
+          for (var m = 0; m < initData.stocks.length; m++) {
+            var st = initData.stocks[m];
+            sOpts += '<option value="' + st.row + '" data-code="' + st.code + '" data-name="' + st.name + '" data-type="' + st.type + '">' + (st.type === 'TW' ? '台' : '美') + ' - ' + st.code + ' ' + st.name + '</option>';
+          }
+        }
+
+        html += '<div class="form-group">' +
+                '  <label>標的代碼 (選擇現有或新增)</label>' +
+                '  <select id="inp-stock-select" onchange="onStockSelectionChange()">' + sOpts + '</select>' +
+                '</div>' +
+                '<div id="new-stock-fields" style="display:none; background:#0d1117; border:1px dashed #30363d; padding:8px; border-radius:4px; margin-bottom:8px;">' +
+                '  <div style="font-size:11px; color:#58a6ff; margin-bottom:4px;">✨ 新增標的模式：將自動寫入試算表</div>' +
+                '  <div class="form-group" style="margin-bottom:6px;">' +
+                '    <label>新代碼</label>' +
+                '    <input type="text" id="inp-new-code" placeholder="例如：2330 或 QQQ">' +
+                '  </div>' +
+                '  <div class="form-group" style="margin-bottom:6px;">' +
+                '  </div>' +
+                '  <div class="form-group" style="margin-bottom:0;">' +
+                '    <label>市場類別</label>' +
+                '    <select id="inp-new-market">' +
+                '      <option value="TW">台股 (TW)</option>' +
+                '      <option value="US">美股 (US)</option>' +
+                '    </select>' +
+                '  </div>' +
+                '</div>' +
+                '<div class="form-group">' +
+                '  <label>買賣動作</label>' +
+                '  <select id="inp-action">' +
+                '    <option value="STOCK_BUY">買進現貨 (+股數/-現金)</option>' +
+                '    <option value="STOCK_SELL">賣出現貨 (-股數/+現金)</option>' +
+                '  </select>' +
+                '</div>' +
+                '<div class="form-group">' +
+                '  <label>異動股數 (股)</label>' +
+                '  <input type="number" id="inp-qty" placeholder="例如：1000">' +
+                '</div>' +
+                '<div class="form-group">' +
+                '  <label>交易金額 (NTD，不扣現金請填 0)</label>' +
+                '  <input type="number" id="inp-amount" value="0">' +
+                '</div>';
+      }
+
+      container.innerHTML = html;
+      if (currentCat === 'LOAN') updateLoanAmount();
+      if (currentCat === 'STOCK') onStockSelectionChange();
+    }
+
+    function onStockSelectionChange() {
+      var sel = document.getElementById('inp-stock-select');
+      var newFields = document.getElementById('new-stock-fields');
+      if (sel && newFields) {
+        if (sel.value === "") {
+          newFields.style.display = 'block';
+        } else {
+          newFields.style.display = 'none';
+        }
+      }
+    }
+
+    function onDividendStockChange() {
+      var sel = document.getElementById('div-stock-select');
+      var opt = sel.options[sel.selectedIndex];
+      var linkBox = document.getElementById('div-ext-link-box');
+      var calcBox = document.getElementById('div-calc-box');
+      
+      if (!sel.value) {
+        linkBox.style.display = 'none';
+        calcBox.style.display = 'none';
+        return;
+      }
+
+      var code = opt.getAttribute('data-code');
+      var qty = Number(opt.getAttribute('data-qty')) || 0;
+
+      document.getElementById('div-ext-goodinfo').href = 'https://goodinfo.tw/tw/StockDividendSchedule.asp?STOCK_ID=' + code;
+      document.getElementById('div-ext-wantgoo').href = 'https://www.wantgoo.com/stock/' + code;
+      linkBox.style.display = 'block';
+
+      document.getElementById('div-stock-qty').innerText = qty.toLocaleString();
+      calcBox.style.display = 'block';
+      document.getElementById('div-per-share').value = '';
+    }
+
+    function calcDividendTotal() {
+      var sel = document.getElementById('div-stock-select');
+      var opt = sel.options[sel.selectedIndex];
+      var qty = Number(opt.getAttribute('data-qty')) || 0;
+      var perShare = Number(document.getElementById('div-per-share').value) || 0;
+
+      if (qty > 0 && perShare > 0) {
+        var total = Math.round(qty * perShare);
+        document.getElementById('inp-amount').value = total;
+      }
+    }
+
+    function updateLoanAmount() {
+      var select = document.getElementById('inp-debt');
+      if (!select) return;
+      var opt = select.options[select.selectedIndex];
+      if (opt) {
+        document.getElementById('inp-amount').value = opt.getAttribute('data-pay') || 0;
+      }
+    }
+
+    function submitDispatch() {
+      var status = document.getElementById('status-msg');
+      status.innerText = '⏳ 調度回寫中...';
+
+      var params = { type: currentCat, amount: document.getElementById('inp-amount') ? Number(document.getElementById('inp-amount').value) : 0 };
+
+      if (currentCat === 'PLEDGE') {
+        params.type = document.getElementById('inp-action').value;
+        params.row = Number(document.getElementById('inp-debt').value);
+      } else if (currentCat === 'FUTURES') {
+        params.type = document.getElementById('inp-action').value;
+        params.market = document.getElementById('inp-market').value;
+      } else if (currentCat === 'LOAN') {
+        params.type = 'LOAN_PAY';
+        params.row = Number(document.getElementById('inp-debt').value);
+      } else if (currentCat === 'STOCK') {
+        params.type = document.getElementById('inp-action').value;
+        var stockSelect = document.getElementById('inp-stock-select');
+        var selectedVal = stockSelect.value;
+        
+        if (selectedVal === "") {
+          params.isNewStock = true;
+          params.code = document.getElementById('inp-new-code').value.trim();
+          params.market = document.getElementById('inp-new-market').value;
+          params.row = 0;
+        } else {
+          params.isNewStock = false;
+          params.row = Number(selectedVal);
+          var opt = stockSelect.options[stockSelect.selectedIndex];
+          params.market = opt ? opt.getAttribute('data-type') : 'TW';
+        }
+        params.qty = Number(document.getElementById('inp-qty') ? document.getElementById('inp-qty').value : 0);
+      }
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!res || res.success === false) {
+            playTone('error');
+            var errorMsg = res ? res.message : '授權失敗或未知錯誤';
+            status.innerText = '❌ ' + errorMsg;
+            if (errorMsg.indexOf('授權') !== -1 || errorMsg.indexOf('解鎖') !== -1 || errorMsg.indexOf('尚未解鎖') !== -1) {
+              alert(errorMsg);
+            }
+            return;
+          }
+          playTone('success');
+          status.innerText = '✅ ' + (res.message || '調度完成！');
+          setTimeout(function() { status.innerText = '系統就緒'; }, 3000);
+          
+          google.script.run.withSuccessHandler(function(data) {
+            if (data) { initData = data; renderForm(); }
+          }).getInitData();
+        })
+        .withFailureHandler(function(err) {
+          playTone('error');
+          status.innerText = '❌ 系統異常：' + err.message;
+        })
+        .executeDispatch(params);
+    }
+
+    renderForm();
+    google.script.run
+      .withSuccessHandler(function(data) {
+        if (data) {
+          initData = data;
+          
+          // 🚀 自動幫後端抓回來的質押名稱加上分類標籤
+          if (initData.pledges && initData.pledges.length > 0) {
+            for (var i = 0; i < initData.pledges.length; i++) {
+              var pName = initData.pledges[i].name || "";
+              // 如果名稱還沒有包含「券商」或「保單」，就根據關鍵字或預設幫它加上去
+              if (pName.indexOf('保單') === -1 && pName.indexOf('券商') === -1 && pName.indexOf('其他') === -1) {
+                if (pName.indexOf('人壽') !== -1) {
+                  initData.pledges[i].name = '保單 - ' + pName;
+                } else if (pName.indexOf('證券') !== -1 || pName.indexOf('富邦') !== -1 || pName.indexOf('國泰') !== -1 || pName.indexOf('元大') !== -1) {
+                  initData.pledges[i].name = '券商 - ' + pName;
+                } else {
+                  initData.pledges[i].name = '其他 - ' + pName;
+                }
+              }
+            }
+          }
+
+          renderForm();
+        }
+      })
+      .getInitData();
+
+    function updatePledgeAmount() {
+      var select = document.getElementById('inp-debt');
+      if (!select) return;
+      var opt = select.options[select.selectedIndex];
+      if (opt) {
+        document.getElementById('inp-amount').value = opt.getAttribute('data-pay') || 0;
+      }
+    }  
+  </script>
+</body>
+</html>

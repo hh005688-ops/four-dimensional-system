@@ -1,0 +1,117 @@
+<div class="hero-board">
+  <div class="hero-title">四維淨資產總值 (Net Worth)</div>
+  <div class="hero-networth" id="dispNetWorth">$0</div>
+  
+  <div class="hero-grid">
+    <div class="hero-stat">
+      <div class="stat-label">資產總計 (總市值+現金)</div>
+      <div class="stat-val" style="color: var(--primary);" id="dispTotalAssets">$0</div>
+    </div>
+    <div class="hero-stat">
+      <div class="stat-label">負債總計 (質押+信貸)</div>
+      <div class="stat-val" style="color: var(--danger);" id="dispTotalLiab">$0</div>
+    </div>
+  </div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi-box">
+    <div class="label">現金水庫</div>
+    <div class="val" style="color: var(--accent);" id="dispCash">$0</div>
+  </div>
+  <div class="kpi-box">
+    <div class="label">質押維持率</div>
+    <div class="val" style="color: var(--warning);" id="dispMaintenance">0.00%</div>
+  </div>
+  <div class="kpi-box">
+    <div class="label">實質槓桿</div>
+    <div class="val" style="color: var(--primary);" id="dispLeverage">0.00 x</div>
+  </div>
+  <div class="kpi-box">
+    <div class="label">資產總 Beta</div>
+    <div class="val" style="color: var(--indigo);" id="dispAssetBeta">0.00</div>
+  </div>
+</div>
+
+<!-- 🥧 巢狀資產配置圓餅（內環大類 / 外環標的，合計 100%） -->
+<div class="card">
+  <div class="card-header-flex">
+    <h3>🥧 巢狀配置圓餅</h3>
+    <span class="badge-count" id="nestedAllocBadge">台股＋美股＋現金 = 100%</span>
+  </div>
+  <div id="nestedAllocChart">⏳ 載入配置圖中...</div>
+</div>
+
+<!-- 🥧 資產配置比例與分佈 -->
+<div class="card fold-card">
+  <details>
+    <summary class="fold-summary">
+      <h3>🥧 資產配置與資金權重</h3>
+      <div class="fold-summary-right">
+        <span class="badge-count" id="assetRatioCount">台美股獨立權重</span>
+        <span class="fold-chevron">▾</span>
+      </div>
+    </summary>
+    <div class="fold-body" id="assetAllocationContainer">
+      <div style="text-align:center; color:var(--subtext); padding: 10px;">⏳ 計算配置比例中...</div>
+    </div>
+  </details>
+</div>
+
+<div class="card fold-card">
+  <details>
+    <summary class="fold-summary">
+      <h3>📈 股票現貨庫存</h3>
+      <div class="fold-summary-right">
+        <span class="badge-count" id="stockCount">0 檔</span>
+        <span class="fold-chevron">▾</span>
+      </div>
+    </summary>
+    <div class="fold-body" id="stockListContainer">
+      <div style="text-align:center; color:var(--subtext); padding: 10px;">⏳ 載入庫存中...</div>
+    </div>
+  </details>
+</div>
+
+<div class="card fold-card">
+  <details>
+    <summary class="fold-summary">
+      <h3>🌐 期貨部位與權益數</h3>
+      <div class="fold-summary-right">
+        <span class="badge-count">即時連動</span>
+        <span class="fold-chevron">▾</span>
+      </div>
+    </summary>
+    <div class="fold-body">
+      <div class="list-item">
+        <div>
+          <div class="name">🇹🇼 國內期貨總權益數(NT)</div>
+          <div class="sub" id="twFutPos">未平倉：持倉觀望 (0口)</div>
+        </div>
+        <div class="data" style="color: var(--accent);" id="twFutMargin">$0</div>
+      </div>
+      <div class="list-item">
+        <div>
+          <div class="name">🌐 海外期貨總權益數(NT)</div>
+          <div class="sub" id="usFutPos">未平倉：持倉觀望 (0口)</div>
+        </div>
+        <div class="data" style="color: var(--accent);" id="usFutMargin">$0</div>
+      </div>
+    </div>
+  </details>
+</div>
+
+<div class="card fold-card">
+  <details>
+    <summary class="fold-summary">
+      <h3>🛡️ 質押與信貸負債</h3>
+      <div class="fold-summary-right">
+        <span class="badge-count">負債總覽</span>
+        <span class="fold-chevron">▾</span>
+      </div>
+    </summary>
+    <div class="fold-body" id="debtListContainer">
+      <div style="text-align:center; color:var(--subtext); padding: 10px;">⏳ 載入負債中...</div>
+    </div>
+  </details>
+</div>

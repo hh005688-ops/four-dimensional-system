@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #0d1117; color: #c9d1d9; padding: 12px; margin: 0; font-size: 13px; display: flex; flex-direction: column; height: 100vh; }
+    
+    .header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid #30363d; margin-bottom: 10px; }
+    .header-title { font-size: 14px; font-weight: bold; color: #58a6ff; display: flex; align-items: center; gap: 6px; }
+    .badge { background: #238636; color: #ffffff; font-size: 10px; padding: 2px 6px; border-radius: 4px; }
+
+    /* 對話訊息區 */
+    #chat-box { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; margin-bottom: 10px; }
+    .msg { padding: 10px 12px; border-radius: 8px; line-height: 1.45; word-break: break-word; font-size: 12px; }
+    .msg-user { background: #1f6feb; color: #ffffff; align-self: flex-end; max-width: 85%; border-bottom-right-radius: 2px; }
+    .msg-ai { background: #161b22; border: 1px solid #30363d; color: #e6edf3; align-self: flex-start; max-width: 95%; border-bottom-left-radius: 2px; }
+    .msg-ai p { margin: 4px 0; }
+    .msg-ai code { background: #0d1117; padding: 2px 4px; border-radius: 4px; color: #79c0ff; }
+
+    /* 快捷功能列 */
+    .quick-actions { display: flex; gap: 6px; margin-bottom: 8px; overflow-x: auto; padding-bottom: 4px; }
+    .quick-btn { background: #21262d; border: 1px solid #30363d; color: #8b949e; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; white-space: nowrap; }
+    .quick-btn:hover { background: #30363d; color: #58a6ff; }
+
+    /* 輸入區 */
+    .input-area { display: flex; flex-direction: column; gap: 6px; }
+    textarea { width: 100%; background: #161b22; border: 1px solid #30363d; color: #f0f6fc; padding: 8px; border-radius: 6px; outline: none; resize: none; font-size: 12px; min-height: 55px; }
+    textarea:focus { border-color: #58a6ff; }
+
+    .btn-send { background: #238636; border: none; color: #fff; padding: 8px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; }
+    .btn-send:hover { background: #2ea043; }
+    .btn-send:disabled { background: #30363d; color: #8b949e; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-title">🧠 四維智腦特助</div>
+    <span class="badge">Gemini / DeepSeek</span>
+  </div>
+
+  <div class="quick-actions">
+    <button class="quick-btn" onclick="sendQuickPrompt('📊 掃描當前選取表格並分析風險')">📊 掃描選區</button>
+    <button class="quick-btn" onclick="sendQuickPrompt('💡 分析目前資產配置與維持率安全水位')">💡 資產健檢</button>
+    <button class="quick-btn" onclick="sendQuickPrompt('🎯 給出今日期貨與現貨操作策略建議')">🎯 操作策略</button>
+  </div>
+
+  <div id="chat-box">
+    <div class="msg msg-ai">
+      👋 閣下好！我是您的四維智腦特助。您可以直接在此提問，或選取試算表區塊後點擊「📊 掃描選區」讓我為您診斷。
+    </div>
+  </div>
+
+  <div class="input-area">
+    <textarea id="user-input" placeholder="輸入指令或問題 (Enter 發送)..." onkeydown="handleKey(event)"></textarea>
+    <button class="btn-send" id="send-btn" onclick="sendMessage()">⚡ 發送指令</button>
+  </div>
+
+  <script>
+    function handleKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    }
+
+    function sendQuickPrompt(promptText) {
+      if (promptText.indexOf("掃描選區") !== -1) {
+        google.script.run.withSuccessHandler(function(data) {
+          const prompt = "以下是試算表當前選取的區域數據：\n" + data + "\n\n請以四維系統首席顧問角度，給出簡潔精闢的分析。";
+          addMessage(promptText, 'msg-user');
+          callAi(prompt);
+        }).GET_SELECTED_DATA_FULL();
+      } else {
+        addMessage(promptText, 'msg-user');
+        callAi(promptText);
+      }
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('user-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      addMessage(text, 'msg-user');
+      input.value = '';
+      callAi(text);
+    }
+
+    function addMessage(text, className) {
+      const box = document.getElementById('chat-box');
+      const div = document.createElement('div');
+      div.className = 'msg ' + className;
+      div.innerText = text;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function callAi(prompt) {
+      const btn = document.getElementById('send-btn');
+      btn.disabled = true;
+      btn.innerText = '⏳ 智腦運算中...';
+
+      const box = document.getElementById('chat-box');
+      const loadingDiv = document.createElement('div');
+      loadingDiv.className = 'msg msg-ai';
+      loadingDiv.id = 'ai-loading';
+      loadingDiv.innerText = '🧠 正在分析四維數據...';
+      box.appendChild(loadingDiv);
+      box.scrollTop = box.scrollHeight;
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          btn.disabled = false;
+          btn.innerText = '⚡ 發送指令';
+          const loadEl = document.getElementById('ai-loading');
+          if (loadEl) loadEl.remove();
+          addMessage(response, 'msg-ai');
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.innerText = '⚡ 發送指令';
+          const loadEl = document.getElementById('ai-loading');
+          if (loadEl) loadEl.remove();
+          addMessage('❌ 連線異常：' + err.message, 'msg-ai');
+        })
+        .CALL_BRAIN_API(prompt);
+    }
+  </script>
+</body>
+</html>

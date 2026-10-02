@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>四維資產配置戰情室 v1.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        body { font-family: 'JetBrains Mono', sans-serif; }
+        /* 獨家風控警示動畫：當維持率危險時，邊框閃爍紅光 */
+        .danger-glow { animation: blink 1.5s infinite; }
+        @keyframes blink {
+            0%, 100% { border-color: #ef4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
+            50% { border-color: #1f2937; box-shadow: none; }
+        }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen p-4 md:p-8">
+
+    <header class="max-w-6xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-800 pb-4">
+        <div>
+            <h1 class="text-2xl font-bold tracking-wider text-cyan-400">📊 FOUR-DIMENSIONAL SYSTEM</h1>
+            <p class="text-xs text-gray-500 mt-1">四維槓桿資產配置整合終端</p>
+        </div>
+        <div class="mt-4 md:mt-0 flex items-center space-x-3">
+            <span id="syncStatus" class="text-xs px-3 py-1 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 font-bold">
+                ● 正在初始化系統...
+            </span>
+            <button onclick="refreshData()" class="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1 rounded border border-gray-700 transition">
+                手動同步 🔄
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <div class="lg:col-span-2 space-y-6">
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-gray-900 border border-gray-800 p-5 rounded-lg shadow-inner">
+                    <p class="text-xs text-gray-500 font-bold uppercase tracking-wider">Net Assets / 淨資產</p>
+                    <p id="displayTotalAsset" class="text-2xl font-bold text-gray-100 mt-2">$--</p>
+                </div>
+                <div class="bg-gray-900 border border-gray-800 p-5 rounded-lg shadow-inner">
+                    <p class="text-xs text-gray-500 font-bold uppercase tracking-wider">Total Leverage / 總槓桿</p>
+                    <p id="displayLeverage" class="text-2xl font-bold text-amber-400 mt-2">-- x</p>
+                </div>
+                <div id="pledgeCard" class="bg-gray-900 border border-gray-800 p-5 rounded-lg shadow-inner transition-all duration-500">
+                    <p class="text-xs text-gray-500 font-bold uppercase tracking-wider">Pledge Ratio / 質押維持率</p>
+                    <p id="displayPledge" class="text-2xl font-bold text-emerald-400 mt-2">--%</p>
+                </div>
+            </div>
+
+            <div class="bg-gray-900 border border-gray-800 p-6 rounded-lg">
+                <h3 class="text-sm font-bold text-gray-400 mb-4 tracking-wider">🎯 CORE HOLDINGS / 核心標的比重 (00965 vs 00926)</h3>
+                <div class="h-64 flex justify-center items-center">
+                    <canvas id="holdingsChart"></canvas>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 p-6 rounded-lg h-fit">
+            <h3 class="text-sm font-bold text-cyan-400 mb-6 tracking-wider">📝 ASSET LOG / 記帳變動變更</h3>
+            
+            <form id="recordForm" class="space-y-5">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-2">操作項目 / 標的選擇</label>
+                    <select id="item" class="w-full bg-gray-950 border border-gray-800 rounded px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-cyan-500" required>
+                        <option value="00965">00965 (全球股票)</option>
+                        <option value="00926">00926 (利基型)</option>
+                        <option value="信貸變動">信貸整合變動</option>
+                        <option value="股票質押">股票質押入金</option>
+                        <option value="期貨保證金">期貨保證金調整</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-2">變動金額 / 單位數量</label>
+                    <input type="number" id="amount" step="any" placeholder="請輸入數值 (正負皆可)" class="w-full bg-gray-950 border border-gray-800 rounded px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-cyan-500" required>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-2">備註說明</label>
+                    <input type="text" id="note" placeholder="例如：新資金投入、維持率調控" class="w-full bg-gray-950 border border-gray-800 rounded px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-cyan-500">
+                </div>
+
+                <button type="submit" id="submitBtn" class="w-full bg-cyan-600 hover:bg-cyan-500 text-gray-950 font-bold py-2 px-4 rounded text-sm tracking-widest transition duration-150">
+                    確認送出 EXECUTE 🚀
+                </button>
+            </form>
+            
+            <p id="formFeedback" class="text-xs text-center mt-4 font-bold text-gray-500"></p>
+        </div>
+
+    </main>
+
+    <script>
+        // 🔗 您的專屬 Google Apps Script 網址（已自動填入您的金鑰）
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbyUR7YCDOdhTyeBGwhiDFUgJhLnsb7BUqb8beJagWPQ9nqEt1OF0PU5v_uuE_bm8VVl/exec';
+
+        let chart;
+
+        // 初始化 Chart.js 圖表
+        function initChart() {
+            const ctx = document.getElementById('holdingsChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['00965 Global', '00926 Niche'],
+                    datasets: [{
+                        label: '資產權重市值',
+                        data: [0, 0],
+                        backgroundColor: ['rgba(34, 211, 238, 0.2)', 'rgba(251, 191, 36, 0.2)'],
+                        borderColor: ['#22d3ee', '#fbbf24'],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af' } },
+                        x: { grid: { display: false }, ticks: { color: '#9ca3af' } }
+                    }
+                }
+            });
+        }
+
+        // 核心：從 Google Sheets 拉取最新數據 (GET)
+        function refreshData() {
+            const status = document.getElementById('syncStatus');
+            status.innerText = '● 正在同步四維雲端核心...';
+            status.className = 'text-xs px-3 py-1 rounded-full bg-amber-950 text-amber-400 border border-amber-800 font-bold';
+
+            fetch(GAS_URL)
+                .then(res => res.json())
+                .then(res => {
+                    if (res.status === 'success') {
+                        const d = res.data;
+                        
+                        // 1. 更新數字呈現
+                        document.getElementById('displayTotalAsset').innerText = '$' + Number(d.totalAsset).toLocaleString();
+                        document.getElementById('displayLeverage').innerText = Number(d.leverageRatio).toFixed(2) + ' x';
+                        
+                        // 2. 處理維持率數值與硬核警報變色
+                        const pledge = d.pledgeRatio;
+                        // 如果 Sheets 回傳的是小數（例如 2.9213），網頁會自動轉成百分比（292.1%）
+                        const displayPledge = (pledge > 10) ? Number(pledge).toFixed(1) + '%' : (pledge * 100).toFixed(1) + '%';
+                        document.getElementById('displayPledge').innerText = displayPledge;
+                        
+                        const pledgeCard = document.getElementById('pledgeCard');
+                        const pledgeText = document.getElementById('displayPledge');
+                        
+                        // 判斷維持率臨界點（相容小數型態或百分比型態）
+                        const checkValue = (pledge > 10) ? pledge : pledge * 100;
+                        if (checkValue < 160) { 
+                            pledgeCard.className = 'bg-red-950 border border-red-500 p-5 rounded-lg danger-glow';
+                            pledgeText.className = 'text-2xl font-bold text-red-400 mt-2';
+                        } else {
+                            pledgeCard.className = 'bg-gray-900 border border-gray-800 p-5 rounded-lg shadow-inner';
+                            pledgeText.className = 'text-2xl font-bold text-emerald-400 mt-2';
+                        }
+
+                        // 3. 更新動態圖表
+                        chart.data.datasets[0].data = [d.etf00965, d.etf00926];
+                        chart.update();
+
+                        status.innerText = '● 系統聯動中 (ONLINE)';
+                        status.className = 'text-xs px-3 py-1 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold';
+                    }
+                })
+                .catch(err => {
+                    status.innerText = '● 連線中斷 (OFFLINE)';
+                    status.className = 'text-xs px-3 py-1 rounded-full bg-red-950 text-red-400 border border-red-800 font-bold';
+                    console.error(err);
+                });
+        }
+
+        // 核心：記帳表單發送 (POST)
+        document.getElementById('recordForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const btn = document.getElementById('submitBtn');
+            const feedback = document.getElementById('formFeedback');
+            
+            btn.disabled = true;
+            btn.innerText = '正在寫入四維金庫...';
+            feedback.innerText = '正在發送加密數據包...';
+            feedback.className = 'text-xs text-center mt-4 font-bold text-amber-400';
+
+            const payload = {
+                item: document.getElementById('item').value,
+                amount: parseFloat(document.getElementById('amount').value),
+                note: document.getElementById('note').value
+            };
+
+            fetch(GAS_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(() => {
+                feedback.innerText = '✅ 寫入成功！等待 3 秒鐘讓核心重算公式...';
+                feedback.className = 'text-xs text-center mt-4 font-bold text-emerald-400';
+                document.getElementById('recordForm').reset();
+                
+                setTimeout(() => {
+                    refreshData();
+                    btn.disabled = false;
+                    btn.innerText = '確認送出 EXECUTE 🚀';
+                    feedback.innerText = '';
+                }, 3000);
+            })
+            .catch(err => {
+                feedback.innerText = '❌ 寫入失敗，請確認網路連線。';
+                feedback.className = 'text-xs text-center mt-4 font-bold text-red-400';
+                btn.disabled = false;
+                btn.innerText = '確認送出 EXECUTE 🚀';
+                console.error(err);
+            });
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initChart();
+            refreshData();
+        });
+    </script>
+</body>
+</html>

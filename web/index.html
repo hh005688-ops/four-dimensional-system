@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>四維掌上中控台</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- 對應「風格及css變數.html」 -->
+  <link rel="stylesheet" href="./css/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+</head>
+<body>
+
+  <!-- 頂部狀態列 -->
+  <div class="top-header">
+    <h2>🏛️ 四維掌上中控台</h2>
+    <div class="header-right">
+      <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">☀️</button>
+      <span class="status-pill" id="topStatus">連線中...</span>
+    </div>
+  </div>
+
+  <!-- Tab 1: 🏛️ 首頁總覽 (對應「首頁.html」) -->
+  <div id="tabHome" class="tab-content active">
+    <div class="hero-board">
+  <div class="hero-title">四維淨資產總值 (Net Worth)</div>
+  <div class="hero-networth" id="dispNetWorth">$0</div>
+  
+  <div class="hero-grid">
+    <div class="hero-stat">
+      <div class="stat-label">資產總計 (總市值+現金)</div>
+      <div class="stat-val" style="color: var(--primary);" id="dispTotalAssets">$0</div>
+    </div>
+    <div class="hero-stat">
+      <div class="stat-label">負債總計 (質押+信貸)</div>
+      <div class="stat-val" style="color: var(--danger);" id="dispTotalLiab">$0</div>
+    </div>
+  </div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi-box">
+    <div class="label">現金水庫</div>
+    <div class="val" style="color: var(--accent);" id="dispCash">$0</div>
+  </div>
+  <div class="kpi-box">
+    <div class="label">質押維持率</div>
+    <div class="val" style="color: var(--warning);" id="dispMaintenance">0.00%</div>
+  </div>
+  <div class="kpi-box">
+    <div class="label">實質槓桿</div>
+    <div class="val" style="color: var(--primary);" id="dispLeverage">0.00 x</div>
+  </div>
+  <div class="kpi-box">
+    <div class="label">資產總 Beta</div>
+    <div class="val" style="color: var(--indigo);" id="dispAssetBeta">0.00</div>
+  </div>
+</div>
+
+<!-- 🥧 巢狀資產配置圓餅（內環大類 / 外環標的，合計 100%） -->
+<div class="card">
+  <div class="card-header-flex">
+    <h3>🥧 巢狀配置圓餅</h3>
+    <span class="badge-count" id="nestedAllocBadge">台股＋美股＋現金 = 100%</span>
+  </div>
+  <div id="nestedAllocChart">⏳ 載入配置圖中...</div>
+</div>
+
+<!-- 🥧 資產配置比例與分佈 -->
+<div class="card fold-card">
+  <details>
+    <summary class="fold-summary">
+      <h3>🥧 資產配置與資金權重</h3>
+      <div class="fold-summary-right">
+        <span class="badge-count" id="assetRatioCount">台美股獨立權重</span>
+        <span class="fold-chevron">▾</span>
+      </div>
+    </summary>
+    <div class="fold-body" id="assetAllocationContainer">
+      <div style="text-align:center; color:var(--subtext); padding: 10px;">⏳ 計算配置比例中...</div>
+    </div>
+  </details>
+</div>
+
+<div class="card fold-card">
+  <details>
+    <summary class="fold-summary">
+      <h3>📈 股票現貨庫存</h3>
+      <div class="fold-summary-right">
+        <span class="badge-count" id="stockCount">0 檔</span>
+        <span class="fold-chevron">▾</span>
+      </div>
+    </summary>
+    <div class="fold-body" id="stockListContainer">
+      <div style="text-align:center; color:var(--subtext); padding: 10px;">⏳ 載入庫存中...</div>
+    </div>
+  </details>
+</div>
+
+<div class="card fold-card">
+  <details>
+    <summary class="fold-summary">
+      <h3>🌐 期貨部位與權益數</h3>
+      <div class="fold-summary-right">
+        <span class="badge-count">即時連動</span>
+        <span class="fold-chevron">▾</span>
+      </div>
+    </summary>
+    <div class="fold-body">
+      <div class="list-item">
+        <div>
+          <div class="name">🇹🇼 國內期貨總權益數(NT)</div>
+          <div class="sub" id="twFutPos">未平倉：持倉觀望 (0口)</div>
+        </div>
+        <div class="data" style="color: var(--accent);" id="twFutMargin">$0</div>
+      </div>
+      <div class="list-item">
+        <div>
+          <div class="name">🌐 海外期貨總權益數(NT)</div>
+          <div class="sub" id="usFutPos">未平倉：持倉觀望 (0口)</div>
+        </div>
+        <div class="data" style="color: var(--accent);" id="usFutMargin">$0</div>
+      </div>
+    </div>
+  </details>
+</div>
+
+<div class="card fold-card">
+  <details>
+    <summary class="fold-summary">
+      <h3>🛡️ 質押與信貸負債</h3>
+      <div class="fold-summary-right">
+        <span class="badge-count">負債總覽</span>
+        <span class="fold-chevron">▾</span>
+      </div>
+    </summary>
+    <div class="fold-body" id="debtListContainer">
+      <div style="text-align:center; color:var(--subtext); padding: 10px;">⏳ 載入負債中...</div>
+    </div>
+  </details>
+</div>
+  </div>
+
+  <!-- Tab 2: ⚡ 資金調度 (對應「資金調度.html」) -->
+  <div id="tabDispatch" class="tab-content">
+    <div class="pill-tabs">
+  <div class="pill-item active" onclick="switchDispatchSub('subCash', this)">💰 水庫金流</div>
+  <div class="pill-item" onclick="switchDispatchSub('subStock', this)">📈 現貨買賣</div>
+  <div class="pill-item" onclick="switchDispatchSub('subPledge', this)">🛡️ 質押劃撥</div>
+  <div class="pill-item" onclick="switchDispatchSub('subFutures', this)">🌐 期貨操作</div>
+</div>
+
+<!-- 1. 水庫金流 -->
+<div id="subCash" class="dispatch-sub">
+  <div class="card">
+    <h3>💰 水庫金流與負債扣繳</h3>
+    <label>金流動作：</label>
+    <select id="cashActionType" onchange="renderCashSubInputs()">
+      <option value="DIVIDEND">💰 股息入帳 (增加水庫/累計配息)</option>
+      <option value="INFLOW">📥 外部注水 (薪資/資金注入)</option>
+      <option value="LOAN_PAY">💳 貸款/信貸扣繳 (扣水庫本利和)</option>
+      <option value="PLEDGE_BORROW">⚡ 券商質押借款撥款 (入水庫)</option>
+      <option value="PLEDGE_REPAY">🛡️ 券商質押還款 (扣水庫還本)</option>
+    </select>
+    
+    <!-- 動態選單容器（適用於 貸款、質押、股息入帳） -->
+    <div id="targetSelectBox" style="display: none;">
+      <label id="targetSelectLabel">選擇項目：</label>
+      <select id="targetSelectDropdown" onchange="onTargetDropdownChange()"></select>
+    </div>
+
+    <!-- 📊 股息專屬的超連結與股數計算檢視區 -->
+    <div id="dividendInfoBox" style="display: none; margin: 10px 0; padding: 10px; background: var(--card-sub); border-radius: 6px; border: 1px solid var(--border);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <span>現有總庫存股數：<strong id="displayShares" style="color: var(--accent);">0</strong> 股</span>
+      </div>
+      <div style="display: flex; gap: 10px; margin-bottom: 8px;">
+        <a id="goodinfoBtn" href="#" target="_blank" class="btn-link" style="flex:1; text-align:center; padding: 6px; background: #2563eb; color: #fff; border-radius: 4px; text-decoration: none; font-size: 12px;">📊 Goodinfo 查詢</a>
+        <a id="moneydjBtn" href="#" target="_blank" class="btn-link" style="flex:1; text-align:center; padding: 6px; background: #059669; color: #fff; border-radius: 4px; text-decoration: none; font-size: 12px;">📈 MoneyDJ 查詢</a>
+      </div>
+      <div>
+        <label style="font-size: 12px;">每股配息 (NTD)：</label>
+        <input type="number" id="dividendPerShareInput" placeholder="輸入每股配息" step="0.01" oninput="calculateTotalDividend()" style="margin-bottom:0;">
+      </div>
+    </div>
+
+    <label>異動金額 (NTD)：</label>
+    <input type="number" id="cashAmountInput" placeholder="請輸入金額">
+    
+    <button class="btn-primary" onclick="submitCashDispatch()">🚀 執行金流回寫</button>
+    <div id="cashLoader" class="loading">⏳ 資料寫入中，請稍候...</div>
+  </div>
+</div>
+
+<!-- 2. 現貨買賣 / 部位管理 -->
+<div id="subStock" class="dispatch-sub" style="display: none;">
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <h3 style="margin:0;">📈 現貨部位管理</h3>
+      <!-- 🔄 切換按鈕：在「既有標的買賣」與「新增標的暨佔比調整」之間切換 -->
+      <button id="toggleStockModeBtn" style="width:auto; padding:4px 10px; font-size:12px; margin:0; background:var(--card-sub);" onclick="toggleStockMode()">➕ 新增標的與佔比調整</button>
+    </div>
+
+    <!-- 📄 畫面一：既有標的買賣增減股數 -->
+    <div id="stockTradeExistingMode">
+      <label>選擇既有標的：</label>
+      <select id="stockTradeSelect"></select>
+      
+      <label>動作：</label>
+      <select id="stockTradeAction">
+        <option value="BUY">📈 買進 (增加股數)</option>
+        <option value="SELL">📉 賣出 (減少股數)</option>
+      </select>
+      
+      <label>變動股數：</label>
+      <input type="number" id="stockTradeQty" placeholder="請輸入股數">
+      
+      <label>連帶動用水庫金額 (NTD，不變動填 0)：</label>
+      <input type="number" id="stockTradeCash" value="0">
+      
+      <button class="btn-primary" onclick="submitStockTrade()">🚀 確認現貨回寫</button>
+    </div>
+
+        <!-- 📄 畫面二：新增全新標的 + 目標佔比調整 (台美股分隔) -->
+    <div id="stockTradeNewMode" style="display: none;">
+      
+      <!-- 1-1. 🇹🇼 台灣市場目標佔比調整 (K 欄) -->
+      <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border);">
+        <label style="color: var(--accent); font-weight: bold;">🇹🇼 台灣市場標的目標佔比調整 (K 欄)：</label>
+        <div id="twStocksRatioContainer" style="margin-bottom: 8px; max-height: 160px; overflow-y: auto;">
+          <!-- 動態產生台股標的 -->
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px; padding: 4px 8px; background: var(--card-sub); border-radius: 4px; font-size: 12px;">
+          <span id="twTotalRatioIndicator">📊 台股總佔比：0.0%</span>
+        </div>
+      </div>
+
+      <!-- 1-2. 🇺🇸 美國市場目標佔比調整 (K 欄) -->
+      <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border);">
+        <label style="color: var(--accent); font-weight: bold;">🇺🇸 美國市場標的目標佔比調整 (K 欄)：</label>
+        <div id="usStocksRatioContainer" style="margin-bottom: 8px; max-height: 160px; overflow-y: auto;">
+          <!-- 動態產生美股標的 -->
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px; padding: 4px 8px; background: var(--card-sub); border-radius: 4px; font-size: 12px;">
+          <span id="usTotalRatioIndicator">📊 美股總佔比：0.0%</span>
+        </div>
+
+        <button class="btn-primary" onclick="submitBatchSaveTargetRatios()">💾 一次性儲存目前市場目標佔比</button>
+      </div>
+
+      <!-- 2. 新增全新標的表單 -->
+      <div>
+        <h4 style="margin: 0 0 10px 0; color: var(--accent);">➕ 新增全新標的</h4>
+        
+        <label>市場別：</label>
+        <select id="newStockMarket">
+          <option value="TW">🇹🇼 台灣市場 (台股 / ETF)</option>
+          <option value="US">🇺🇸 美國市場 (美股 / ETF)</option>
+        </select>
+        
+        <label>股票代碼 (例: 00631L 或 TQQQ)：</label>
+        <input type="text" id="newStockCode" placeholder="輸入代碼後試算表將自動帶入名稱">
+
+        <label>買入股數：</label>
+        <input type="number" id="newStockQty" placeholder="0">
+        
+        <label>買入總價 (NTD，自動扣除現金水庫)：</label>
+        <input type="number" id="newStockCashTotal" placeholder="請輸入總金額" value="0">
+        
+        <label>目標佔比 (例如 10 代表 10%)：</label>
+        <input type="number" id="newStockRatio" placeholder="10">
+        
+        <button class="btn-primary" onclick="submitAddNewStock()">✨ 建立並初始化標的</button>
+      </div>
+
+    </div>
+
+
+    <div id="stockLoader" class="loading">⏳ 資料處理中，請稍候...</div>
+  </div>
+</div>
+
+<!-- 3. 質押劃撥 -->
+<div id="subPledge" class="dispatch-sub" style="display: none;">
+  <div class="card">
+    <h3>🛡️ 質押庫存劃撥</h3>
+    <label>劃撥標的：</label>
+    <select id="pledgeStockSelect"></select>
+    <label>劃撥動作：</label>
+    <select id="pledgeAction">
+      <option value="LOCK">🔒 現貨 ➔ 撥入質押庫存 (鎖定擔保品)</option>
+      <option value="UNLOCK">🔓 質押庫存 ➔ 解除釋出 (轉回一般現貨)</option>
+    </select>
+    <label>劃撥股數：</label>
+    <input type="number" id="pledgeQtyInput" placeholder="請輸入劃撥股數">
+    
+    <button class="btn-primary" onclick="submitPledgeTransfer()">⚡ 執行質押股數劃撥</button>
+    <div id="pledgeLoader" class="loading">⏳ 資料寫入中，請稍候...</div>
+  </div>
+</div>
+
+<!-- 4. 期貨操作（直覺的上下並陳模式，不需切換） -->
+<div id="subFutures" class="dispatch-sub" style="display: none;">
+  
+  <!-- 區塊一：期貨部位與保證金調度 -->
+  <div class="card" style="margin-bottom: 20px;">
+    <h3>🌐 期貨部位與保證金調度</h3>
+    <label>市場與商品：</label>
+    <select id="futMarketSelect">
+      <option value="TW">🇹🇼 國內期貨 (TX)</option>
+      <option value="US">🌐 海外期貨 (MNQ)</option>
+    </select>
+    
+    <label>調度動作：</label>
+    <select id="futActionSelect">
+      <option value="IN">📥 保證金入金 (水庫扣款 ➔ 保證金增加)</option>
+      <option value="OUT">📤 保證金出金 (保證金提取 ➔ 水庫增加)</option>
+    </select>
+    
+    <label>金額 (NTD)：</label>
+    <input type="number" id="futAmountInput" placeholder="請輸入保證金金額">
+    
+    <button class="btn-primary" onclick="submitFuturesTransfer()">🚀 執行期貨連動回寫</button>
+  </div>
+
+  <!-- 區塊二：新增期貨部位建倉（支援下拉選單與手動輸入切換） -->
+  <div class="card">
+    <h3 style="margin-bottom: 15px; color: var(--accent);">📈 新增期貨部位建倉</h3>
+    <form id="futuresPositionForm">
+      
+      <!-- 1. 市場分區 -->
+      <div class="mb-3" style="margin-bottom: 15px;">
+        <label for="marketType" class="form-label" style="display:block; margin-bottom:5px;">市場分區：</label>
+        <select class="form-select" id="marketType" onchange="loadExistingContracts()" required style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border);">
+          <option value="domestic">國內期貨區 </option>
+          <option value="overseas">海外期貨區 </option>
+        </select>
+      </div>
+
+      <!-- 2. 合約代碼（支援下拉選單與手動新增切換） -->
+      <div class="mb-3" style="margin-bottom: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+          <label for="existingContractSelect" class="form-label" style="margin: 0;">合約代碼：</label>
+          <!-- 🎨 放大高度、增加辨識度與顏色區隔的切換按鈕 -->
+          <button type="button" id="toggleContractModeBtn" onclick="toggleContractInputMode()" style="background: #e0f2fe; border: 1px solid #0284c7; padding: 6px 12px; font-size: 12px; font-weight: bold; border-radius: 6px; cursor: pointer; color: #0369a1; transition: all 0.2s;">➕ 切換手動新增合約</button>
+        </div>
+
+        <!-- 模式 A：下拉選單 -->
+        <select class="form-select" id="existingContractSelect" required style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border);">
+          <option value="">-- 請先選擇或載入合約代碼 --</option>
+        </select>
+
+        <!-- 模式 B：手動輸入框 -->
+        <input type="text" class="form-control" id="customContractInput" placeholder="請輸入全新合約代碼或月份名稱 (例: 臺股期貨 202611)" style="display: none; width:100%; padding:8px; border-radius:4px; border:1px solid var(--border);">
+      </div>
+
+      <!-- 3 & 4. 多/空 與 單位口數 -->
+      <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+        <div style="flex: 1;">
+          <label for="colD" class="form-label" style="display:block; margin-bottom:5px;">多/空：</label>
+          <select class="form-select" id="colD" required style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border);">
+            <option value="多">多</option>
+            <option value="空">空</option>
+          </select>
+        </div>
+        <div style="flex: 1;">
+          <label for="colE" class="form-label" style="display:block; margin-bottom:5px;">單位口數：</label>
+          <input type="number" class="form-control" id="colE" placeholder="請輸入口數" required style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border);">
+        </div>
+      </div>
+
+      <!-- 5 & 6. 本期買入均價 與 狀態 -->
+      <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+        <div style="flex: 1;">
+          <label for="colF" class="form-label" style="display:block; margin-bottom:5px;">本期買入均價：</label>
+          <input type="number" step="any" class="form-control" id="colF" placeholder="請輸入買入均價" required style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border);">
+        </div>
+        <div style="flex: 1;">
+          <label for="colI" class="form-label" style="display:block; margin-bottom:5px;">狀態：</label>
+          <select class="form-select" id="colI" style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border);">
+            <option value="加碼">加碼</option>
+            <option value="平倉">平倉</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 7. 平倉價 -->
+      <div class="mb-3" style="margin-bottom: 15px;">
+        <label for="colJ" class="form-label" style="display:block; margin-bottom:5px;">平倉價 (若未平倉請留空)：</label>
+        <input type="number" step="any" class="form-control" id="colJ" placeholder="選填" style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border);">
+      </div>
+
+      <button type="button" class="btn-primary" onclick="submitFuturesPosition()" style="width:100%;">🚀 執行期貨部位回寫</button>
+    </form>
+  </div>
+  
+  <div id="futLoader" class="loading">⏳ 資料處理中，請稍候...</div>
+</div>
+</script>
+  </div>
+
+  <!-- Tab 3: 📊 營運快照 -->
+<div id="tabSnapshot" class="tab-content">
+    
+    <!-- ⚙️ 手動快照與數據維護 (收合選單區塊 - 保持不變) -->
+    <div class="card" style="padding: 12px 16px;">
+      <details>
+        <summary style="cursor: pointer; font-weight: bold; color: var(--text); font-size: 14px; outline: none; user-select: none;">
+          ⚙️ 手動快照與數據維護工具 <span style="font-size: 11px; color: var(--subtext); font-weight: normal;">(點擊展開/收合)</span>
+        </summary>
+        <div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+          
+          <div style="font-size: 12px; color: var(--subtext); margin-bottom: 8px;">📊 每日收盤快照打卡</div>
+          <div class="btn-grid">
+            <button class="btn-primary" onclick="triggerSnapshot('TW')">🇹🇼 台股快照 (14:00)</button>
+            <button class="btn-primary" onclick="triggerSnapshot('US')">🇺🇸 美國快照 (06:15)</button>
+          </div>
+          <button class="btn-primary" style="background: var(--card-sub); color: var(--text); border: 1px solid var(--border); margin-top: 8px; width: 100%;" onclick="triggerSnapshot('DAILY')">🏛️ 執行全系統每日總覽 (14:15)</button>
+          <div id="snapshotLoader" class="loading" style="display:none; margin-top: 8px;">⏳ 正在計算指標並寫入快照...</div>
+          
+          <div style="font-size: 12px; color: var(--subtext); margin: 16px 0 8px 0;">🔄 數據維護與參數刷新</div>
+          <button class="btn-primary" style="background: var(--accent); color: #fff; margin-bottom: 8px; width: 100%;" onclick="triggerRefresh('BETA')">⚡ 一鍵刷新台美股 Beta / Alpha</button>
+          <button class="btn-primary" style="background: var(--card-sub); color: var(--text); border: 1px solid var(--border); width: 100%;" onclick="triggerRefresh('MARKET')">📈 刷新期貨最新點位與美元匯率</button>
+
+        </div>
+      </details>
+    </div>
+
+    <!-- 🌟 整合後的資產圖表與明細總模組（內含統一工具列、圖表與三張連動表格） -->
+    <!-- 📊 營運快照與歷史複盤整合介面 (HTML 排版) -->
+<div class="card" style="margin-top: 15px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+    
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <h3 style="margin: 0;">📊 營運快照複盤</h3>
+      <select id="masterViewSelector" style="background: var(--card-sub); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-size: 12px; font-weight: bold; cursor: pointer;" onchange="switchMasterView(this.value)">
+        <option value="OVERVIEW">🌍 總資產與淨資產 (總覽)</option>
+        <option value="TW">🇹🇼 台股市值走勢複盤</option>
+        <option value="US">🇺🇸 美股市值走勢複盤 (折合台幣)</option>
+      </select>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+      <div style="display: flex; background: var(--card-sub); border: 1px solid var(--border); border-radius: 6px; padding: 2px;">
+        <button class="range-btn active" onclick="setChartRange('ALL', this)">全部</button>
+        <button class="range-btn" onclick="setChartRange('1W', this)">週</button>
+        <button class="range-btn" onclick="setChartRange('1M', this)">月</button>
+        <button class="range-btn" onclick="setChartRange('1Q', this)">季</button>
+        <button class="range-btn" onclick="setChartRange('6M', this)">半年</button>
+        <button class="range-btn" onclick="setChartRange('1Y', this)">年</button>
+      </div>
+      
+      <div style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--subtext);">
+        <input type="date" id="customStartDate" style="background: var(--card-sub); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; font-size: 11px;" onchange="filterCustomRange()">
+        <span>~</span>
+        <input type="date" id="customEndDate" style="background: var(--card-sub); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; font-size: 11px;" onchange="filterCustomRange()">
+      </div>
+      
+      <button class="btn-primary" style="padding: 4px 8px; font-size: 11px; width: auto;" onclick="loadSnapshotHistoryTable(); loadSnapshotCharts();">🔄 重新整理</button>
+    </div>
+  </div>
+
+  <div id="dailyChart" style="width: 100%; height: 380px; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--subtext); padding: 20px; text-align: center; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 15px;">⏳ 正在初始化並向後端請求數據...</div>
+
+  <div style="border-top: 1px solid var(--border); padding-top: 12px;">
+    <!-- 總覽表格 -->
+    <div id="tableGeneralContainer" class="snapshot-table-pane" style="overflow-x: auto; max-height: 350px; border: 1px solid var(--border); border-radius: 6px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap;">
+        <thead>
+          <tr style="background: var(--card-sub); border-bottom: 2px solid var(--border); color: var(--text); position: sticky; top: 0; z-index: 1;">
+            <th style="padding: 8px; text-align: left;">日期</th>
+            <th style="padding: 8px; text-align: right;">總資產市值</th>
+            <th style="padding: 8px; text-align: right;">淨資產</th>
+            <th style="padding: 8px; text-align: right;">今日獲利</th>
+            <th style="padding: 8px; text-align: right;">今日報酬率</th>
+            <th style="padding: 8px; text-align: right;">累積獲利</th>
+          </tr>
+        </thead>
+        <tbody id="generalTableBody">
+          <tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--subtext);">⏳ 載入中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 台股表格 -->
+    <div id="tableTaiwanContainer" class="snapshot-table-pane" style="display: none; overflow-x: auto; max-height: 350px; border: 1px solid var(--border); border-radius: 6px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap;">
+        <thead>
+          <tr style="background: var(--card-sub); border-bottom: 2px solid var(--border); color: var(--text); position: sticky; top: 0; z-index: 1;">
+            <th style="padding: 8px; text-align: left;">日期</th>
+            <th style="padding: 8px; text-align: right;">台股市值</th>
+            <th style="padding: 8px; text-align: right;">今日損益</th>
+            <th style="padding: 8px; text-align: right;">今日漲跌幅</th>
+            <th style="padding: 8px; text-align: right;">大盤漲跌</th>
+            <th style="padding: 8px; text-align: right;">Alpha值</th>
+          </tr>
+        </thead>
+        <tbody id="taiwanTableBody">
+          <tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--subtext);">⏳ 載入中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 美股表格 -->
+    <div id="tableUsContainer" class="snapshot-table-pane" style="display: none; overflow-x: auto; max-height: 350px; border: 1px solid var(--border); border-radius: 6px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap;">
+        <thead>
+          <tr style="background: var(--card-sub); border-bottom: 2px solid var(--border); color: var(--text); position: sticky; top: 0; z-index: 1;">
+            <th style="padding: 8px; text-align: left;">日期</th>
+            <th style="padding: 8px; text-align: right;">美股市值</th>
+            <th style="padding: 8px; text-align: right;">今日損益</th>
+            <th style="padding: 8px; text-align: right;">今日漲跌幅</th>
+            <th style="padding: 8px; text-align: right;">匯差損益(NT)</th>
+            <th style="padding: 8px; text-align: right;">Alpha</th>
+          </tr>
+        </thead>
+        <tbody id="usTableBody">
+          <tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--subtext);">⏳ 載入中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- JavaScript 邏輯必須用 script 標籤包起來 -->
+
+</div>
+
+  <!-- Tab 4: ⚙️ 系統設定 -->
+  <div id="tabSettings" class="tab-content">
+    <div class="card">
+      <h3>🔗 四維帳本掛載設定</h3>
+      <label>GAS Web App 網址（/exec）：</label>
+      <input type="text" id="gasApiUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
+      <label>試算表 ID 或 共用網址：</label>
+      <input type="text" id="sheetIdInput">
+      <button class="btn-primary" onclick="connectSheet()">連線 / 重新整理帳本</button>
+      <div id="connStatus" style="font-size: 13px; color: var(--subtext);">尚未連線。請先部署 GAS 為「任何人」可執行，再貼上 Web App 網址。</div>
+    </div>
+  </div>
+
+  <!-- 📱 底部 4 大導覽列 -->
+  <div class="bottom-nav">
+    <div class="nav-item active" onclick="switchMainTab('tabHome', this)">
+      <div class="nav-icon">🏛️</div>
+      <span>總覽</span>
+    </div>
+    <div class="nav-item" onclick="switchMainTab('tabDispatch', this)">
+      <div class="nav-icon">⚡</div>
+      <span>調度</span>
+    </div>
+    <div class="nav-item" onclick="switchMainTab('tabSnapshot', this)">
+      <div class="nav-icon">📊</div>
+      <span>快照</span>
+    </div>
+    <div class="nav-item" onclick="switchMainTab('tabSettings', this)">
+      <div class="nav-icon">⚙️</div>
+      <span>設定</span>
+    </div>
+  </div>
+
+  <!-- 對應「互動邏輯.html」 -->
+  <script src="./js/app.js"></script>
+  <script src="./js/charts.js"></script>
+</body>
+</html>

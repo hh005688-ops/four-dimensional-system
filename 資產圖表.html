@@ -1,0 +1,412 @@
+<!-- 📊 營運快照與歷史複盤整合介面 (HTML 排版) -->
+<div class="card" style="margin-top: 15px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+    
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <h3 style="margin: 0;">📊 營運快照複盤</h3>
+      <select id="masterViewSelector" style="background: var(--card-sub); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-size: 12px; font-weight: bold; cursor: pointer;" onchange="switchMasterView(this.value)">
+        <option value="OVERVIEW">🌍 總資產與淨資產 (總覽)</option>
+        <option value="TW">🇹🇼 台股市值走勢複盤</option>
+        <option value="US">🇺🇸 美股市值走勢複盤 (折合台幣)</option>
+      </select>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+      <div style="display: flex; background: var(--card-sub); border: 1px solid var(--border); border-radius: 6px; padding: 2px;">
+        <button class="range-btn active" onclick="setChartRange('ALL', this)">全部</button>
+        <button class="range-btn" onclick="setChartRange('1W', this)">週</button>
+        <button class="range-btn" onclick="setChartRange('1M', this)">月</button>
+        <button class="range-btn" onclick="setChartRange('1Q', this)">季</button>
+        <button class="range-btn" onclick="setChartRange('6M', this)">半年</button>
+        <button class="range-btn" onclick="setChartRange('1Y', this)">年</button>
+      </div>
+      
+      <div style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--subtext);">
+        <input type="date" id="customStartDate" style="background: var(--card-sub); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; font-size: 11px;" onchange="filterCustomRange()">
+        <span>~</span>
+        <input type="date" id="customEndDate" style="background: var(--card-sub); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; font-size: 11px;" onchange="filterCustomRange()">
+      </div>
+      
+      <button class="btn-primary" style="padding: 4px 8px; font-size: 11px; width: auto;" onclick="loadSnapshotHistoryTable(); loadSnapshotCharts();">🔄 重新整理</button>
+    </div>
+  </div>
+
+  <div id="dailyChart" style="width: 100%; height: 380px; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--subtext); padding: 20px; text-align: center; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 15px;">⏳ 正在初始化並向後端請求數據...</div>
+
+  <div style="border-top: 1px solid var(--border); padding-top: 12px;">
+    <!-- 總覽表格 -->
+    <div id="tableGeneralContainer" class="snapshot-table-pane" style="overflow-x: auto; max-height: 350px; border: 1px solid var(--border); border-radius: 6px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap;">
+        <thead>
+          <tr style="background: var(--card-sub); border-bottom: 2px solid var(--border); color: var(--text); position: sticky; top: 0; z-index: 1;">
+            <th style="padding: 8px; text-align: left;">日期</th>
+            <th style="padding: 8px; text-align: right;">總資產市值</th>
+            <th style="padding: 8px; text-align: right;">淨資產</th>
+            <th style="padding: 8px; text-align: right;">今日獲利</th>
+            <th style="padding: 8px; text-align: right;">今日報酬率</th>
+            <th style="padding: 8px; text-align: right;">累積獲利</th>
+          </tr>
+        </thead>
+        <tbody id="generalTableBody">
+          <tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--subtext);">⏳ 載入中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 台股表格 -->
+    <div id="tableTaiwanContainer" class="snapshot-table-pane" style="display: none; overflow-x: auto; max-height: 350px; border: 1px solid var(--border); border-radius: 6px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap;">
+        <thead>
+          <tr style="background: var(--card-sub); border-bottom: 2px solid var(--border); color: var(--text); position: sticky; top: 0; z-index: 1;">
+            <th style="padding: 8px; text-align: left;">日期</th>
+            <th style="padding: 8px; text-align: right;">台股市值</th>
+            <th style="padding: 8px; text-align: right;">今日損益</th>
+            <th style="padding: 8px; text-align: right;">今日漲跌幅</th>
+            <th style="padding: 8px; text-align: right;">大盤漲跌</th>
+            <th style="padding: 8px; text-align: right;">Alpha值</th>
+          </tr>
+        </thead>
+        <tbody id="taiwanTableBody">
+          <tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--subtext);">⏳ 載入中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 美股表格 -->
+    <div id="tableUsContainer" class="snapshot-table-pane" style="display: none; overflow-x: auto; max-height: 350px; border: 1px solid var(--border); border-radius: 6px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap;">
+        <thead>
+          <tr style="background: var(--card-sub); border-bottom: 2px solid var(--border); color: var(--text); position: sticky; top: 0; z-index: 1;">
+            <th style="padding: 8px; text-align: left;">日期</th>
+            <th style="padding: 8px; text-align: right;">美股市值</th>
+            <th style="padding: 8px; text-align: right;">今日損益</th>
+            <th style="padding: 8px; text-align: right;">今日漲跌幅</th>
+            <th style="padding: 8px; text-align: right;">匯差損益(NT)</th>
+            <th style="padding: 8px; text-align: right;">Alpha</th>
+          </tr>
+        </thead>
+        <tbody id="usTableBody">
+          <tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--subtext);">⏳ 載入中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+  .range-btn {
+    background: transparent;
+    border: none;
+    color: var(--subtext);
+    padding: 3px 8px;
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .range-btn:hover { color: var(--text); }
+  .range-btn.active { background: var(--accent); color: #fff; font-weight: bold; }
+</style>
+
+<!-- JavaScript 邏輯必須用 script 標籤包起來 -->
+<script>
+  var cachedOverviewData = null;
+  var cachedStockData = null;
+  var globalChartInstance = null;
+  
+  var rawSnapshotTables = {
+    general: [],
+    taiwan: [],
+    us: []
+  };
+
+  function switchMasterView(type) {
+    document.querySelectorAll('.snapshot-table-pane').forEach(function(pane) { 
+      pane.style.display = 'none'; 
+    });
+
+    if (type === 'OVERVIEW') {
+      document.getElementById('tableGeneralContainer').style.display = 'block';
+      if (cachedOverviewData) renderOverviewChart(cachedOverviewData);
+    } else if (type === 'TW') {
+      document.getElementById('tableTaiwanContainer').style.display = 'block';
+      if (cachedStockData && cachedStockData.tw) {
+        renderSingleStockChart('台股市值', cachedStockData.tw.dates, cachedStockData.tw.values, '#10b981');
+      }
+    } else if (type === 'US') {
+      document.getElementById('tableUsContainer').style.display = 'block';
+      if (cachedStockData && cachedStockData.us) {
+        renderSingleStockChart('美股市值 (折合台幣)', cachedStockData.us.dates, cachedStockData.us.values, '#f59e0b');
+      }
+    }
+
+    filterCustomRange();
+  }
+
+  function loadSnapshotCharts() {
+    var sheetId = "";
+    try {
+      sheetId = typeof getCurrentSheetId === 'function' ? getCurrentSheetId() : "";
+    } catch(e) { console.warn(e); }
+
+    var chartDom = document.getElementById('dailyChart');
+    if (chartDom) chartDom.innerHTML = '⏳ 正在向後端取得歷史紀錄...';
+
+    if (typeof callGasApi !== 'function') return;
+
+    callGasApi('getDailyLogHistoryUniversal', { sheetId: sheetId })
+      .then(function(res) {
+        if (res && res.success) {
+          cachedOverviewData = res;
+          var view = document.getElementById('masterViewSelector').value;
+          if (view === 'OVERVIEW') renderOverviewChart(res);
+        }
+      })
+      .catch(function(err) { console.warn(err); });
+
+    callGasApi('getStockLogHistoryUniversal', { sheetId: sheetId })
+      .then(function(res) {
+        if (res && res.success) {
+          cachedStockData = res;
+          var view = document.getElementById('masterViewSelector').value;
+          if (view !== 'OVERVIEW') switchMasterView(view);
+        }
+      })
+      .catch(function(err) { console.warn(err); });
+  }
+
+  function loadSnapshotHistoryTable() {
+    var sheetId = "";
+    try {
+      sheetId = typeof getCurrentSheetId === 'function' ? getCurrentSheetId() : "";
+    } catch(e) { console.warn(e); }
+    if (!sheetId) return;
+    if (typeof callGasApi !== 'function') return;
+
+    callGasApi('getSnapshotHistoryDataUniversal', { sheetId: sheetId })
+      .then(function(res) {
+        if (!res || !res.success) return;
+        rawSnapshotTables.general = res.general || [];
+        rawSnapshotTables.taiwan = res.taiwan || [];
+        rawSnapshotTables.us = res.us || [];
+        filterCustomRange();
+      })
+      .catch(function(err) { console.warn(err); });
+  }
+
+  function renderFilteredTables(startDate, endDate) {
+    function filterData(dataList) {
+      if (!startDate && !endDate) return dataList.slice().reverse();
+      return dataList.filter(function(row) {
+        var d = new Date(row.date);
+        if (startDate && d < startDate) return false;
+        if (endDate && d > endDate) return false;
+        return true;
+      }).reverse();
+    }
+
+    var filteredGen = filterData(rawSnapshotTables.general);
+    var filteredTw = filterData(rawSnapshotTables.taiwan);
+    var filteredUs = filterData(rawSnapshotTables.us);
+
+    var genBody = document.getElementById('generalTableBody');
+    if (genBody) {
+      genBody.innerHTML = filteredGen.length > 0 ? filteredGen.map(function(row) {
+        var pCol = (Number(row.todayProfit) >= 0) ? 'var(--accent, #10b981)' : 'var(--danger, #ef4444)';
+        var rCol = (Number(row.todayReturn) >= 0) ? 'var(--accent, #10b981)' : 'var(--danger, #ef4444)';
+        return '<tr style="border-bottom: 1px solid var(--border);">' +
+          '<td style="padding: 6px 8px;"><strong>' + row.date + '</strong></td>' +
+          '<td style="padding: 6px 8px; text-align: right;">$' + Number(row.totalAsset).toLocaleString() + '</td>' +
+          '<td style="padding: 6px 8px; text-align: right;">$' + Number(row.netAsset).toLocaleString() + '</td>' +
+          '<td style="padding: 6px 8px; text-align: right; color:' + pCol + ';">$' + Math.round(row.todayProfit).toLocaleString() + '</td>' +
+          '<td style="padding: 6px 8px; text-align: right; color:' + rCol + ';">' + (row.todayReturn * 100).toFixed(2) + '%</td>' +
+          '<td style="padding: 6px 8px; text-align: right;">$' + Math.round(row.cumProfit).toLocaleString() + '</td>' +
+          '</tr>';
+      }).join('') : '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--subtext);">此區間無總覽紀錄</td></tr>';
+    }
+
+    var twBody = document.getElementById('taiwanTableBody');
+    if (twBody) {
+      twBody.innerHTML = filteredTw.length > 0 ? filteredTw.map(function(row) {
+        var pCol = (Number(row.profit) >= 0) ? 'var(--accent, #10b981)' : 'var(--danger, #ef4444)';
+        var rCol = (Number(row.returnRate) >= 0) ? 'var(--accent, #10b981)' : 'var(--danger, #ef4444)';
+        return '<tr style="border-bottom: 1px solid var(--border);">' +
+          '<td style="padding: 6px 8px;"><strong>' + row.date + '</strong></td>' +
+          '<td style="padding: 6px 8px; text-align: right;">$' + Number(row.marketVal).toLocaleString() + '</td>' +
+          '<td style="padding: 6px 8px; text-align: right; color:' + pCol + ';">$' + Math.round(row.profit).toLocaleString() + '</td>' +
+          '<td style="padding: 6px 8px; text-align: right; color:' + rCol + ';">' + (row.returnRate * 100).toFixed(2) + '%</td>' +
+          '<td style="padding: 6px 8px; text-align: right;">' + (row.benchReturn * 100).toFixed(2) + '%</td>' +
+          '<td style="padding: 6px 8px; text-align: right;">' + (row.alpha * 100).toFixed(2) + '%</td>' +
+          '</tr>';
+      }).join('') : '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--subtext);">此區間無台股明細</td></tr>';
+    }
+
+    var usBody = document.getElementById('usTableBody');
+    if (usBody) {
+      usBody.innerHTML = filteredUs.length > 0 ? filteredUs.map(function(row) {
+        var pCol = (Number(row.profit) >= 0) ? 'var(--accent, #10b981)' : 'var(--danger, #ef4444)';
+        var rCol = (Number(row.returnRate) >= 0) ? 'var(--accent, #10b981)' : 'var(--danger, #ef4444)';
+        return '<tr style="border-bottom: 1px solid var(--border);">' +
+          '<td style="padding: 6px 8px;"><strong>' + row.date + '</strong></td>' +
+          '<td style="padding: 6px 8px; text-align: right;">$' + Number(row.marketVal).toLocaleString() + '</td>' +
+          '<td style="padding: 6px 8px; text-align: right; color:' + pCol + ';">$' + Math.round(row.profit).toLocaleString() + '</td>' +
+          '<td style="padding: 6px 8px; text-align: right; color:' + rCol + ';">' + (row.returnRate * 100).toFixed(2) + '%</td>' +
+          '<td style="padding: 6px 8px; text-align: right;">$' + Number(row.fxProfit).toLocaleString() + '</td>' +
+          '<td style="padding: 6px 8px; text-align: right;">' + (row.alpha * 100).toFixed(2) + '%</td>' +
+          '</tr>';
+      }).join('') : '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--subtext);">此區間無美股明細</td></tr>';
+    }
+  }
+
+  function filterCustomRange() {
+    var startVal = document.getElementById('customStartDate').value;
+    var endVal = document.getElementById('customEndDate').value;
+    var startDate = startVal ? new Date(startVal) : null;
+    var endDate = endVal ? new Date(endVal) : null;
+    renderFilteredTables(startDate, endDate);
+  }
+
+  function setChartRange(type, btnEl) {
+    var btns = btnEl.parentNode.querySelectorAll('.range-btn');
+    btns.forEach(function(b) { b.classList.remove('active'); });
+    btnEl.classList.add('active');
+
+    var view = document.getElementById('masterViewSelector').value;
+    var dates = [];
+    if (view === 'OVERVIEW' && cachedOverviewData) {
+      dates = cachedOverviewData.dates;
+    } else if (cachedStockData && cachedStockData.tw) {
+      dates = cachedStockData.tw.dates;
+    }
+
+    if (!dates || dates.length === 0) return;
+
+    var lastDateStr = dates[dates.length - 1];
+    var lastDate = new Date(lastDateStr);
+    var startDate = new Date(lastDate);
+
+    if (type === 'ALL') {
+      if (globalChartInstance) globalChartInstance.dispatchAction({ type: 'dataZoom', start: 0, end: 100 });
+      document.getElementById('customStartDate').value = '';
+      document.getElementById('customEndDate').value = '';
+      renderFilteredTables(null, null);
+      return;
+    } else if (type === '1W') {
+      startDate.setDate(lastDate.getDate() - 7);
+    } else if (type === '1M') {
+      startDate.setMonth(lastDate.getMonth() - 1);
+    } else if (type === '1Q') {
+      startDate.setMonth(lastDate.getMonth() - 3);
+    } else if (type === '6M') {
+      startDate.setMonth(lastDate.getMonth() - 6);
+    } else if (type === '1Y') {
+      startDate.setFullYear(lastDate.getFullYear() - 1);
+    }
+
+    document.getElementById('customStartDate').value = startDate.toISOString().split('T')[0];
+    document.getElementById('customEndDate').value = lastDate.toISOString().split('T')[0];
+    renderFilteredTables(startDate, lastDate);
+
+    if (globalChartInstance) {
+      var startIndex = 0;
+      for (var i = 0; i < dates.length; i++) {
+        if (new Date(dates[i]) >= startDate) { startIndex = i; break; }
+      }
+      var startPercent = (startIndex / (dates.length - 1)) * 100;
+      globalChartInstance.dispatchAction({ type: 'dataZoom', start: Math.max(0, startPercent), end: 100 });
+    }
+  }
+
+  function formatMoneyAxis(value) {
+    if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+    if (value >= 1000) return (value / 1000).toFixed(0) + 'k';
+    return value;
+  }
+
+  function renderOverviewChart(dataObj) {
+    var chartDom = document.getElementById('dailyChart');
+    if (!chartDom) return;
+    if (globalChartInstance) globalChartInstance.dispose();
+
+    globalChartInstance = echarts.init(chartDom, 'dark');
+    var option = {
+      backgroundColor: 'transparent',
+      tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+      legend: { data: ['總資產', '淨資產', '動態回撤率'], textStyle: { color: '#ccc', fontSize: 11 }, top: 0 },
+      dataZoom: [{ type: 'slider', xAxisIndex: [0, 1], start: 0, end: 100, bottom: '2%', height: 16 }, { type: 'inside', xAxisIndex: [0, 1] }],
+      grid: [{ left: '12%', right: '3%', top: '15%', height: '48%' }, { left: '12%', right: '3%', top: '70%', height: '18%' }],
+      xAxis: [
+        { type: 'category', data: dataObj.dates, gridIndex: 0, boundaryGap: false, axisLabel: { show: false } },
+        { type: 'category', data: dataObj.dates, gridIndex: 1, boundaryGap: false, axisLabel: { color: '#aaa', fontSize: 10 } }
+      ],
+      yAxis: [
+        { type: 'value', gridIndex: 0, scale: false, splitLine: { lineStyle: { color: '#333' } }, axisLabel: { color: '#aaa', fontSize: 11, formatter: formatMoneyAxis } },
+        { type: 'value', gridIndex: 1, scale: false, inverse: true, max: 0, splitLine: { lineStyle: { color: '#333' } }, axisLabel: { color: '#aaa', fontSize: 11, formatter: '{value}%' } }
+      ],
+      series: [
+        { name: '總資產', type: 'line', xAxisIndex: 0, yAxisIndex: 0, data: dataObj.assets, itemStyle: { color: '#4169E1' }, showSymbol: false, lineStyle: { width: 2 } },
+        { name: '淨資產', type: 'line', xAxisIndex: 0, yAxisIndex: 0, data: dataObj.netWorths, itemStyle: { color: '#00FA9A' }, showSymbol: false, lineStyle: { width: 2 } },
+        { name: '動態回撤率', type: 'line', xAxisIndex: 1, yAxisIndex: 1, data: dataObj.marketDDs, itemStyle: { color: '#FF4500' }, showSymbol: false, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(255, 69, 0, 0.4)' }, { offset: 1, color: 'rgba(255, 69, 0, 0.02)' }]) }, lineStyle: { width: 1.5 } }
+      ]
+    };
+    globalChartInstance.setOption(option);
+  }
+
+  function renderSingleStockChart(name, dates, values, colorHex) {
+    var chartDom = document.getElementById('dailyChart');
+    if (!chartDom) return;
+    if (globalChartInstance) globalChartInstance.dispose();
+
+    globalChartInstance = echarts.init(chartDom, 'dark');
+    var option = {
+      backgroundColor: 'transparent',
+      tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+      legend: { data: [name], textStyle: { color: '#ccc', fontSize: 11 }, top: 0 },
+      dataZoom: [{ type: 'slider', start: 0, end: 100, bottom: '2%', height: 16 }, { type: 'inside' }],
+      grid: { left: '12%', right: '3%', top: '15%', bottom: '20%' },
+      xAxis: { type: 'category', data: dates, boundaryGap: false, axisLabel: { color: '#aaa', fontSize: 10 } },
+      yAxis: { type: 'value', scale: false, splitLine: { lineStyle: { color: '#333' } }, axisLabel: { color: '#aaa', fontSize: 11, formatter: formatMoneyAxis } },
+      series: [{
+        name: name,
+        type: 'line',
+        data: values,
+        itemStyle: { color: colorHex },
+        showSymbol: false,
+        areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: colorHex + '66' }, { offset: 1, color: colorHex + '05' }]) },
+        lineStyle: { width: 2 }
+      }]
+    };
+    globalChartInstance.setOption(option);
+  }
+
+  // 🏛️ 分頁切換總指揮函式
+  function switchMainTab(tabId, el) {
+    document.querySelectorAll('.tab-content').forEach(function(tab) {
+      tab.classList.remove('active');
+    });
+    document.querySelectorAll('.nav-item').forEach(function(item) {
+      item.classList.remove('active');
+    });
+    
+    var targetTab = document.getElementById(tabId);
+    if (targetTab) {
+      targetTab.classList.add('active');
+    }
+    if (el) {
+      el.classList.add('active');
+    }
+
+    if (tabId === 'tabHome' && typeof resizeNestedAllocationChart === 'function') {
+      setTimeout(resizeNestedAllocationChart, 60);
+    }
+    // 當切換到快照頁籤時，自動觸發歷史走勢圖與歷史明細表格載入
+    if (tabId === 'tabSnapshot') {
+      if (typeof loadSnapshotCharts === 'function') {
+        loadSnapshotCharts();
+      }
+      if (typeof loadSnapshotHistoryTable === 'function') {
+        loadSnapshotHistoryTable();
+      }
+    }
+  }
+</script>
