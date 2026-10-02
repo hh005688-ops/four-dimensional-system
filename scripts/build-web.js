@@ -39,5 +39,23 @@ html = html.replace(
   '<script src="./js/app.js"></script>\n  <script src="./js/charts.js"></script>'
 );
 html = html.replace("<head>", '<head>\n  <meta charset="UTF-8">\n  <title>四維掌上中控台</title>');
+const iconTags =
+  '\n  <!-- iOS 專用 -->\n' +
+  '  <link rel="apple-touch-icon" sizes="180x180" href="/public/icon.png">\n' +
+  '  <!-- Android 與通用 PWA 專用 -->\n' +
+  '  <link rel="icon" type="image/png" sizes="192x192" href="/public/icon.png">\n' +
+  '  <!-- 設定瀏覽器網址列的主題色 -->\n' +
+  '  <meta name="theme-color" content="#1e293b">';
+if (html.indexOf('rel="apple-touch-icon"') === -1) {
+  html = html.replace("</head>", iconTags + "\n</head>");
+}
+
+const publicIcon = path.join(root, "public", "icon.png");
+const webPublic = path.join(web, "public");
+if (fs.existsSync(publicIcon)) {
+  fs.mkdirSync(webPublic, { recursive: true });
+  fs.copyFileSync(publicIcon, path.join(webPublic, "icon.png"));
+}
+
 fs.writeFileSync(path.join(web, "index.html"), html, "utf8");
 console.log("built", web);
