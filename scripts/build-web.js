@@ -45,9 +45,12 @@ const iconTags =
   '  <!-- Android 與通用 PWA 專用 -->\n' +
   '  <link rel="icon" type="image/png" sizes="192x192" href="/public/icon.png">\n' +
   '  <!-- 設定瀏覽器網址列的主題色 -->\n' +
-  '  <meta name="theme-color" content="#1e293b">';
+  '  <meta name="theme-color" content="#1e293b">\n' +
+  '  <link rel="manifest" href="/manifest.json">';
 if (html.indexOf('rel="apple-touch-icon"') === -1) {
   html = html.replace("</head>", iconTags + "\n</head>");
+} else if (html.indexOf('rel="manifest"') === -1) {
+  html = html.replace("</head>", '  <link rel="manifest" href="/manifest.json">\n</head>');
 }
 
 const publicIcon = path.join(root, "public", "icon.png");
@@ -55,6 +58,11 @@ const webPublic = path.join(web, "public");
 if (fs.existsSync(publicIcon)) {
   fs.mkdirSync(webPublic, { recursive: true });
   fs.copyFileSync(publicIcon, path.join(webPublic, "icon.png"));
+}
+
+const manifestSrc = path.join(root, "manifest.json");
+if (fs.existsSync(manifestSrc)) {
+  fs.copyFileSync(manifestSrc, path.join(web, "manifest.json"));
 }
 
 fs.writeFileSync(path.join(web, "index.html"), html, "utf8");
