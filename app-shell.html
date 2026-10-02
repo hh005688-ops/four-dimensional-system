@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>四維掌上中控台</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- iOS 專用 -->
+  <link rel="apple-touch-icon" sizes="180x180" href="/public/icon.png">
+  <!-- Android 與通用 PWA 專用 -->
+  <link rel="icon" type="image/png" sizes="192x192" href="/public/icon.png">
+  <!-- 設定瀏覽器網址列的主題色 -->
+  <meta name="theme-color" content="#1e293b">
+  <link rel="manifest" href="/manifest.json">
+  <!-- 對應「風格及css變數.html」 -->
+  <link rel="stylesheet" href="./css/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+</head>
+<body>
+
+  <!-- 頂部狀態列 -->
+  <div class="top-header">
+    <h2>🏛️ 四維掌上中控台</h2>
+    <div class="header-right">
+      <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">☀️</button>
+      <span class="status-pill" id="topStatus">連線中...</span>
+    </div>
+  </div>
+
+  <!-- Tab 1: 🏛️ 首頁總覽 (對應「首頁.html」) -->
+  <div id="tabHome" class="tab-content active">
+@@INCLUDE_HOME@@
+  </div>
+
+  <!-- Tab 2: ⚡ 資金調度 (對應「資金調度.html」) -->
+  <div id="tabDispatch" class="tab-content">
+@@INCLUDE_DISPATCH@@
+  </div>
+
+  <!-- Tab 3: 📊 營運快照 -->
+  <div id="tabSnapshot" class="tab-content">
+    <div class="card" style="padding: 12px 16px;">
+      <details>
+        <summary style="cursor: pointer; font-weight: bold; color: var(--text); font-size: 14px; outline: none; user-select: none;">
+          ⚙️ 手動快照與數據維護工具 <span style="font-size: 11px; color: var(--subtext); font-weight: normal;">(點擊展開/收合)</span>
+        </summary>
+        <div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+          <div style="font-size: 12px; color: var(--subtext); margin-bottom: 8px;">📊 每日收盤快照打卡</div>
+          <div class="btn-grid">
+            <button class="btn-primary" onclick="triggerSnapshot('TW')">🇹🇼 台股快照 (14:00)</button>
+            <button class="btn-primary" onclick="triggerSnapshot('US')">🇺🇸 美國快照 (06:15)</button>
+          </div>
+          <button class="btn-primary" style="background: var(--card-sub); color: var(--text); border: 1px solid var(--border); margin-top: 8px; width: 100%;" onclick="triggerSnapshot('DAILY')">🏛️ 執行全系統每日總覽 (14:15)</button>
+          <div id="snapshotLoader" class="loading" style="display:none; margin-top: 8px;">⏳ 正在計算指標並寫入快照...</div>
+          <div style="font-size: 12px; color: var(--subtext); margin: 16px 0 8px 0;">🔄 數據維護與參數刷新</div>
+          <button class="btn-primary" style="background: var(--accent); color: #fff; margin-bottom: 8px; width: 100%;" onclick="triggerRefresh('BETA')">⚡ 一鍵刷新台美股 Beta / Alpha</button>
+          <button class="btn-primary" style="background: var(--card-sub); color: var(--text); border: 1px solid var(--border); width: 100%;" onclick="triggerRefresh('MARKET')">📈 刷新期貨最新點位與美元匯率</button>
+        </div>
+      </details>
+    </div>
+@@INCLUDE_CHARTS_HTML@@
+  </div>
+
+  <!-- Tab 4: ⚙️ 系統設定 -->
+  <div id="tabSettings" class="tab-content">
+    <div class="card">
+      <h3>🔗 四維帳本掛載設定</h3>
+      <label>GAS Web App 網址（/exec）：</label>
+      <input type="text" id="gasApiUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
+      <label>試算表 ID 或 共用網址：</label>
+      <input type="text" id="sheetIdInput">
+      <button class="btn-primary" onclick="connectSheet()">連線 / 重新整理帳本</button>
+      <div id="connStatus" style="font-size: 13px; color: var(--subtext);">尚未連線。請先部署 GAS 為「任何人」可執行，再貼上 Web App 網址。</div>
+    </div>
+  </div>
+
+  <!-- 📱 底部 4 大導覽列 -->
+  <div class="bottom-nav">
+    <div class="nav-item active" onclick="switchMainTab('tabHome', this)">
+      <div class="nav-icon">🏛️</div>
+      <span>總覽</span>
+    </div>
+    <div class="nav-item" onclick="switchMainTab('tabDispatch', this)">
+      <div class="nav-icon">⚡</div>
+      <span>調度</span>
+    </div>
+    <div class="nav-item" onclick="switchMainTab('tabSnapshot', this)">
+      <div class="nav-icon">📊</div>
+      <span>快照</span>
+    </div>
+    <div class="nav-item" onclick="switchMainTab('tabSettings', this)">
+      <div class="nav-icon">⚙️</div>
+      <span>設定</span>
+    </div>
+  </div>
+
+  <!-- 對應「互動邏輯.html」與「資產圖表.html」腳本 -->
+  <script src="./js/app.js"></script>
+  <script src="./js/charts.js"></script>
+</body>
+</html>

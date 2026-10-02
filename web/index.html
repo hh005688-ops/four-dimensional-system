@@ -28,7 +28,7 @@
 
   <!-- Tab 1: 🏛️ 首頁總覽 (對應「首頁.html」) -->
   <div id="tabHome" class="tab-content active">
-    <div class="hero-board">
+<div class="hero-board">
   <div class="hero-title">四維淨資產總值 (Net Worth)</div>
   <div class="hero-networth" id="dispNetWorth">$0</div>
   
@@ -149,7 +149,7 @@
 
   <!-- Tab 2: ⚡ 資金調度 (對應「資金調度.html」) -->
   <div id="tabDispatch" class="tab-content">
-    <div class="pill-tabs">
+<div class="pill-tabs">
   <div class="pill-item active" onclick="switchDispatchSub('subCash', this)">💰 水庫金流</div>
   <div class="pill-item" onclick="switchDispatchSub('subStock', this)">📈 現貨買賣</div>
   <div class="pill-item" onclick="switchDispatchSub('subPledge', this)">🛡️ 質押劃撥</div>
@@ -402,20 +402,16 @@
   
   <div id="futLoader" class="loading">⏳ 資料處理中，請稍候...</div>
 </div>
-</script>
   </div>
 
   <!-- Tab 3: 📊 營運快照 -->
-<div id="tabSnapshot" class="tab-content">
-    
-    <!-- ⚙️ 手動快照與數據維護 (收合選單區塊 - 保持不變) -->
+  <div id="tabSnapshot" class="tab-content">
     <div class="card" style="padding: 12px 16px;">
       <details>
         <summary style="cursor: pointer; font-weight: bold; color: var(--text); font-size: 14px; outline: none; user-select: none;">
           ⚙️ 手動快照與數據維護工具 <span style="font-size: 11px; color: var(--subtext); font-weight: normal;">(點擊展開/收合)</span>
         </summary>
         <div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
-          
           <div style="font-size: 12px; color: var(--subtext); margin-bottom: 8px;">📊 每日收盤快照打卡</div>
           <div class="btn-grid">
             <button class="btn-primary" onclick="triggerSnapshot('TW')">🇹🇼 台股快照 (14:00)</button>
@@ -423,17 +419,13 @@
           </div>
           <button class="btn-primary" style="background: var(--card-sub); color: var(--text); border: 1px solid var(--border); margin-top: 8px; width: 100%;" onclick="triggerSnapshot('DAILY')">🏛️ 執行全系統每日總覽 (14:15)</button>
           <div id="snapshotLoader" class="loading" style="display:none; margin-top: 8px;">⏳ 正在計算指標並寫入快照...</div>
-          
           <div style="font-size: 12px; color: var(--subtext); margin: 16px 0 8px 0;">🔄 數據維護與參數刷新</div>
           <button class="btn-primary" style="background: var(--accent); color: #fff; margin-bottom: 8px; width: 100%;" onclick="triggerRefresh('BETA')">⚡ 一鍵刷新台美股 Beta / Alpha</button>
           <button class="btn-primary" style="background: var(--card-sub); color: var(--text); border: 1px solid var(--border); width: 100%;" onclick="triggerRefresh('MARKET')">📈 刷新期貨最新點位與美元匯率</button>
-
         </div>
       </details>
     </div>
-
-    <!-- 🌟 整合後的資產圖表與明細總模組（內含統一工具列、圖表與三張連動表格） -->
-    <!-- 📊 營運快照與歷史複盤整合介面 (HTML 排版) -->
+<!-- 📊 營運快照與歷史複盤整合介面 (HTML 排版) -->
 <div class="card" style="margin-top: 15px;">
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
     
@@ -531,8 +523,7 @@
 
 
 <!-- JavaScript 邏輯必須用 script 標籤包起來 -->
-
-</div>
+  </div>
 
   <!-- Tab 4: ⚙️ 系統設定 -->
   <div id="tabSettings" class="tab-content">
@@ -567,7 +558,7 @@
     </div>
   </div>
 
-  <!-- 對應「互動邏輯.html」 -->
+  <!-- 對應「互動邏輯.html」與「資產圖表.html」腳本 -->
   <script src="./js/app.js"></script>
   <script src="./js/charts.js"></script>
 </body>
