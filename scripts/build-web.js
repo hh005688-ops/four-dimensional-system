@@ -74,11 +74,13 @@ function buildWeb() {
     throw new Error("組裝結果缺少中控台必要區塊，已中止以免寫入錯誤介面。");
   }
 
-  const publicIcon = path.join(root, "public", "icon.png");
+  const publicDir = path.join(root, "public");
   const webPublic = path.join(web, "public");
-  if (fs.existsSync(publicIcon)) {
+  if (fs.existsSync(publicDir)) {
     fs.mkdirSync(webPublic, { recursive: true });
-    fs.copyFileSync(publicIcon, path.join(webPublic, "icon.png"));
+    fs.readdirSync(publicDir).forEach(function (f) {
+      if (/\.png$/i.test(f)) fs.copyFileSync(path.join(publicDir, f), path.join(webPublic, f));
+    });
   }
 
   const manifestSrc = path.join(root, "manifest.json");
