@@ -23,43 +23,101 @@ var nestPieChartInstance = null;
     if (globalData) renderNestedAllocationChart(globalData);
   }
 
+  // 試算表 ID 已改由伺服器環境變數決定；此值只是讓舊的「有沒有連線」判斷維持通過，伺服器不會採用它。
   function getCurrentSheetId() {
-    var inputVal = document.getElementById('sheetIdInput') ? document.getElementById('sheetIdInput').value.trim() : '';
-    var localVal = localStorage.getItem('4D_SHEET_ID');
-    return inputVal || localVal || DEFAULT_SHEET_ID;
+    return 'SERVER';
   }
 
-  function getGasApiUrl() {
-    var inputVal = document.getElementById('gasApiUrlInput') ? document.getElementById('gasApiUrlInput').value.trim() : '';
-    return inputVal || localStorage.getItem('4D_GAS_API') || '';
+  var PW_KEY = '4D_APP_PW';
+
+  function getAppPassword() {
+    try { return localStorage.getItem(PW_KEY) || ''; } catch (e) { return ''; }
+  }
+
+  function saveAppPassword(pw) {
+    try { localStorage.setItem(PW_KEY, pw); } catch (e) {}
+  }
+
+  function clearAppPassword() {
+    try { localStorage.removeItem(PW_KEY); } catch (e) {}
+  }
+
+  function showPasswordGate(msg) {
+    var gate = document.getElementById('pwGate');
+    if (!gate) return;
+    var err = document.getElementById('pwGateMsg');
+    if (err) err.innerText = msg || '';
+    gate.style.display = 'flex';
+    var input = document.getElementById('pwGateInput');
+    if (input) { input.value = ''; input.focus(); }
+  }
+
+  function hidePasswordGate() {
+    var gate = document.getElementById('pwGate');
+    if (gate) gate.style.display = 'none';
+  }
+
+  function submitPassword() {
+    var input = document.getElementById('pwGateInput');
+    var pw = input ? input.value : '';
+    var msg = document.getElementById('pwGateMsg');
+    if (!pw) { if (msg) msg.innerText = '請輸入密碼'; return; }
+    if (msg) msg.innerText = '⏳ 驗證中...';
+    fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-app-password': pw },
+      body: '{}'
+    }).then(function(res) {
+      if (res.status === 200) {
+        saveAppPassword(pw);
+        hidePasswordGate();
+        connectSheet();
+      } else if (res.status === 401) {
+        if (msg) msg.innerText = '❌ 密碼錯誤';
+      } else {
+        if (msg) msg.innerText = '❌ 伺服器異常（' + res.status + '），請確認 Vercel 環境變數';
+      }
+    }).catch(function() {
+      if (msg) msg.innerText = '❌ 無法連線，請檢查網路';
+    });
+  }
+
+  function logoutDevice() {
+    clearAppPassword();
+    globalData = null;
+    showPasswordGate('已登出此裝置，請重新輸入密碼');
   }
 
   function callGasApi(action, extra) {
     extra = extra || {};
-    var url = getGasApiUrl();
-    if (!url) {
-      return Promise.reject(new Error('尚未設定 GAS Web App 網址（設定頁貼上 /exec 連結）'));
+    var pw = getAppPassword();
+    if (!pw) {
+      showPasswordGate('');
+      return Promise.reject(new Error('請先輸入密碼'));
     }
     var body = {
       action: action,
-      sheetId: extra.sheetId !== undefined ? extra.sheetId : getCurrentSheetId(),
       actionType: extra.actionType,
       params: extra.params || {},
       market: extra.market,
       code: extra.code
     };
-    return fetch(url, {
+    return fetch('/api/gas', {
       method: 'POST',
-      redirect: 'follow',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      headers: { 'Content-Type': 'application/json', 'x-app-password': pw },
       body: JSON.stringify(body)
     }).then(function(res) {
+      if (res.status === 401) {
+        clearAppPassword();
+        showPasswordGate('🔒 密碼錯誤或已更換，請重新輸入');
+        throw new Error('密碼錯誤或已更換，請重新輸入');
+      }
       return res.text();
     }).then(function(text) {
       try {
         return JSON.parse(text);
       } catch (err) {
-        throw new Error('API 回傳不是 JSON，請確認已部署 Web App 且權限為「任何人」');
+        throw new Error('伺服器回傳格式錯誤，請稍後再試');
       }
     });
   }
@@ -78,15 +136,10 @@ var nestPieChartInstance = null;
 
   window.onload = function() {
     initTheme();
-    if (document.getElementById('gasApiUrlInput')) {
-      document.getElementById('gasApiUrlInput').value = getGasApiUrl();
-    }
-    var savedId = getCurrentSheetId();
-    if (document.getElementById('sheetIdInput')) {
-      document.getElementById('sheetIdInput').value = savedId;
-    }
-    if (getGasApiUrl() && savedId) {
+    if (getAppPassword()) {
       connectSheet();
+    } else {
+      showPasswordGate('');
     }
   };
 
@@ -110,21 +163,12 @@ var nestPieChartInstance = null;
   }
 
   function connectSheet() {
-    var apiUrl = getGasApiUrl();
-    if (apiUrl && document.getElementById('gasApiUrlInput')) {
-      localStorage.setItem('4D_GAS_API', apiUrl);
-    }
-    var val = getCurrentSheetId();
-    if (!getGasApiUrl()) return alert("請先在設定頁貼上 GAS Web App 網址（/exec）！");
-    if (!val) return alert("請輸入試算表網址或 ID！");
-    
     document.getElementById('connStatus').innerText = "⏳ 正在讀取帳本架構...";
     document.getElementById('topStatus').innerText = "連線中...";
 
-    callGasApi('getInitDataUniversal', { sheetId: val })
+    callGasApi('getInitDataUniversal')
       .then(function(res) {
         if (!handleResponseGuard(res, function(data) {
-          localStorage.setItem('4D_SHEET_ID', val);
           globalData = data;
           globalData.stocks = (globalData.stocks || []).filter(isInventoryStock_);
           
