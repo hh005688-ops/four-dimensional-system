@@ -4,3 +4,4 @@ vercel.json
 .git/**
 .clasprc.json
 node_modules/**
+api/**

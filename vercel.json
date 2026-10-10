@@ -1,4 +1,7 @@
 {
   "buildCommand": "node scripts/build-web.js",
-  "outputDirectory": "web"
+  "outputDirectory": "web",
+  "functions": {
+    "api/*.js": { "maxDuration": 60 }
+  }
 }
