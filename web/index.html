@@ -17,6 +17,17 @@
 </head>
 <body>
 
+  <!-- 🔐 自用密碼輸入畫面（第一次輸入後瀏覽器會記住） -->
+  <div id="pwGate" style="display:none; position:fixed; inset:0; z-index:9999; background:var(--bg, #0f172a); align-items:center; justify-content:center; padding:16px;">
+    <div class="card" style="width:100%; max-width:340px;">
+      <h3>🔐 四維掌上中控台</h3>
+      <label>請輸入密碼：</label>
+      <input type="password" id="pwGateInput" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitPassword()">
+      <button class="btn-primary" onclick="submitPassword()">進入</button>
+      <div id="pwGateMsg" style="font-size: 13px; color: var(--subtext); margin-top: 8px;"></div>
+    </div>
+  </div>
+
   <!-- 頂部狀態列 -->
   <div class="top-header">
     <h2>🏛️ 四維掌上中控台</h2>
@@ -528,13 +539,10 @@
   <!-- Tab 4: ⚙️ 系統設定 -->
   <div id="tabSettings" class="tab-content">
     <div class="card">
-      <h3>🔗 四維帳本掛載設定</h3>
-      <label>GAS Web App 網址（/exec）：</label>
-      <input type="text" id="gasApiUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
-      <label>試算表 ID 或 共用網址：</label>
-      <input type="text" id="sheetIdInput">
+      <h3>🔗 四維帳本連線</h3>
       <button class="btn-primary" onclick="connectSheet()">連線 / 重新整理帳本</button>
-      <div id="connStatus" style="font-size: 13px; color: var(--subtext);">尚未連線。請先部署 GAS 為「任何人」可執行，再貼上 Web App 網址。</div>
+      <div id="connStatus" style="font-size: 13px; color: var(--subtext);">尚未連線。</div>
+      <button class="btn-primary" style="background: var(--card-sub); color: var(--text); border: 1px solid var(--border); margin-top: 12px;" onclick="logoutDevice()">🔓 登出此裝置（清除記住的密碼）</button>
     </div>
   </div>
 

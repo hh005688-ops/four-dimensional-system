@@ -44,8 +44,35 @@ function parseApiPayload_(e) {
   return payload;
 }
 
+/**
+ * 🔐 暗號檢查：Vercel 轉送層會在 POST body 帶 secret，需與「指令碼屬性」API_SECRET 相同。
+ * - 只讀 POST body，不讀網址參數（避免暗號留在網址紀錄裡）。
+ * - 指令碼屬性 API_SECRET 尚未設定 → 暫不檢查（供上線切換用；上線完成後務必設定）。
+ */
+function verifyApiSecret_(e) {
+  var expected = PropertiesService.getScriptProperties().getProperty("API_SECRET");
+  if (!expected) return true;
+  var given = "";
+  try {
+    if (e && e.postData && e.postData.contents) {
+      given = String((JSON.parse(e.postData.contents) || {}).secret || "");
+    }
+  } catch (err) {
+    given = "";
+  }
+  if (given.length !== expected.length) return false;
+  var diff = 0;
+  for (var i = 0; i < expected.length; i++) {
+    diff |= expected.charCodeAt(i) ^ given.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
 function routeGasApi_(e) {
   try {
+    if (!verifyApiSecret_(e)) {
+      return jsonOutput_({ success: false, message: "🔒 未授權" });
+    }
     var payload = parseApiPayload_(e);
     var action = String(payload.action || "").trim();
     if (!action) {
