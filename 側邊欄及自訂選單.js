@@ -12,7 +12,6 @@ function onOpen() {
   menu.addItem('🔑 啟動/解鎖系統', 'showActivationPrompt')
       .addItem('⚡ 開啟四維資產即時監控', 'showFourDimensionsSidebar')
       .addItem('🧠 開啟四維智腦特助 (AI)', 'OPEN_BRAIN_SIDEBAR')
-      .addItem('🌐 開啟系統 Web App', 'openWebAppDirectly')
       .addSeparator()
       .addItem('🚀 舊版/基礎版一鍵無痛轉移', 'migrateFromOldVersion')
       .addSeparator()

@@ -131,18 +131,3 @@ function CALL_BRAIN_API(prompt) {
     return "❌ 執行智腦 API 失敗：" + e.toString();
   }
 }
-
-// 🌐 點選單時觸發，彈出 Web App 專屬連結視窗
-function openWebAppDirectly() {
-  var webAppUrl = "https://script.google.com/macros/s/AKfycbzfx-TbbU-s1-DVmllcGD_xqnzoPPOcfqvQy6P6rRSLQ2Q123433SUNZgLlRTKXagtykg/exec"; // 👈 請換成您的真實 Web App 網址
-  
-  var htmlOutput = HtmlService.createHtmlOutput(
-    '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\' , Roboto, sans-serif; text-align: center; padding: 25px; background-color: #f8fafc; border-radius: 8px;">' +
-      '<h3 style="color: #0f172a; margin-bottom: 10px;">🚀 四維系統遠端 Web App</h3>' +
-      '<p style="color: #475569; font-size: 14px; margin-bottom: 20px;">請點擊下方按鈕前往專屬操作介面：</p>' +
-      '<a href="' + webAppUrl + '" target="_blank" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">立即開啟 Web App 網頁</a>' +
-    '</div>'
-  ).setWidth(380).setHeight(200);
-  
-  SpreadsheetApp.getUi().showModalDialog(htmlOutput, "🔗 外部系統導航");
-}

@@ -47,11 +47,11 @@ function parseApiPayload_(e) {
 /**
  * 🔐 暗號檢查：Vercel 轉送層會在 POST body 帶 secret，需與「指令碼屬性」API_SECRET 相同。
  * - 只讀 POST body，不讀網址參數（避免暗號留在網址紀錄裡）。
- * - 指令碼屬性 API_SECRET 尚未設定 → 暫不檢查（供上線切換用；上線完成後務必設定）。
+ * - 指令碼屬性 API_SECRET 沒設定 → 一律拒絕（寧可擋掉，也不要變成沒人檢查）。
  */
 function verifyApiSecret_(e) {
   var expected = PropertiesService.getScriptProperties().getProperty("API_SECRET");
-  if (!expected) return true;
+  if (!expected) return false;
   var given = "";
   try {
     if (e && e.postData && e.postData.contents) {
