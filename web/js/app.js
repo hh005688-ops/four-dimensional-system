@@ -134,8 +134,67 @@ var nestPieChartInstance = null;
       });
   }
 
+  // 設定分頁的「工具」卡片：之後新增工具，只要在 TOOLS 多加一筆資料。
+  // icon 是圖片路徑（放在專案根目錄 images/ 資料夾）；圖片不存在或載入失敗時，改顯示 glyph 指定的內建 SVG 圖示。
+  var TOOLS = [
+    {
+      name: '槓桿組合比對',
+      desc: '比較不同持股與負債下的風險',
+      url: 'https://leverage-combination.vercel.app',
+      icon: 'images/leverage.png',
+      glyph: 'chart'
+    }
+  ];
+
+  var TOOL_GLYPHS = {
+    chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M6 21v-6"/><path d="M12 21V9"/><path d="M18 21V4"/></svg>',
+    link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>'
+  };
+
+  function renderTools() {
+    var grid = document.getElementById('toolGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    TOOLS.forEach(function(t) {
+      var a = document.createElement('a');
+      a.className = 'tool-card';
+      a.href = t.url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+
+      var iconBox = document.createElement('div');
+      iconBox.className = 'tool-icon';
+      iconBox.innerHTML = TOOL_GLYPHS[t.glyph] || TOOL_GLYPHS.link; // 先顯示內建圖示，圖片載入成功才換上去，避免出現破圖
+      if (t.icon) {
+        var img = new Image();
+        img.alt = '';
+        img.onload = function() {
+          iconBox.innerHTML = '';
+          iconBox.appendChild(img);
+        };
+        img.src = t.icon;
+      }
+
+      var text = document.createElement('div');
+      text.className = 'tool-text';
+      var name = document.createElement('div');
+      name.className = 'tool-name';
+      name.textContent = t.name;
+      var desc = document.createElement('div');
+      desc.className = 'tool-desc';
+      desc.textContent = t.desc;
+      text.appendChild(name);
+      text.appendChild(desc);
+
+      a.appendChild(iconBox);
+      a.appendChild(text);
+      grid.appendChild(a);
+    });
+  }
+
   window.onload = function() {
     initTheme();
+    renderTools();
     if (getAppPassword()) {
       connectSheet();
     } else {

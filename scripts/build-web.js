@@ -83,6 +83,16 @@ function buildWeb() {
     });
   }
 
+  // 工具卡片用的圖片：根目錄 images/ → web/images/
+  const imagesDir = path.join(root, "images");
+  if (fs.existsSync(imagesDir)) {
+    const webImages = path.join(web, "images");
+    fs.mkdirSync(webImages, { recursive: true });
+    fs.readdirSync(imagesDir).forEach(function (f) {
+      if (/\.(png|jpe?g|webp|svg|gif)$/i.test(f)) fs.copyFileSync(path.join(imagesDir, f), path.join(webImages, f));
+    });
+  }
+
   const manifestSrc = path.join(root, "manifest.json");
   if (fs.existsSync(manifestSrc)) {
     fs.copyFileSync(manifestSrc, path.join(web, "manifest.json"));
