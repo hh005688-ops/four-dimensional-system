@@ -25,8 +25,10 @@ function setupDailyTrigger() {
   runWithAccessCheck_(function() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    const targetFunctions = ['recordDailySnapshot', 'recordTaiwanStock', 'recordUSStock', 'handleDropdownEdit'];
-    const triggers = ScriptApp.getUserTriggers(ss);
+    const targetFunctions = ['recordDailySnapshot', 'recordTaiwanStock', 'recordUSStock', 'handleDropdownEdit',
+      'sendDailyBriefingScheduled', 'sendWeeklyDeepReportScheduled', 'sendMonthlyDeepReportScheduled'];
+    // getUserTriggers(ss) 只回傳綁定試算表的觸發器，抓不到時間驅動型，會造成重複排程
+    const triggers = ScriptApp.getProjectTriggers();
     
     for (var i = 0; i < triggers.length; i++) {
       if (targetFunctions.indexOf(triggers[i].getHandlerFunction()) !== -1) {
@@ -46,6 +48,14 @@ function setupDailyTrigger() {
     ScriptApp.newTrigger('recordDailySnapshot')
       .timeBased().everyDays(1).atHour(14).nearMinute(15).create();
 
+    // LINE 推播排程：盤後速報(平日)、週報(週六)、月報(每月1日)
+    ScriptApp.newTrigger('sendDailyBriefingScheduled')
+      .timeBased().everyDays(1).atHour(14).nearMinute(30).create();
+    ScriptApp.newTrigger('sendWeeklyDeepReportScheduled')
+      .timeBased().onWeekDay(ScriptApp.WeekDay.SATURDAY).atHour(10).create();
+    ScriptApp.newTrigger('sendMonthlyDeepReportScheduled')
+      .timeBased().onMonthDay(1).atHour(10).create();
+
     // 編輯觸發監聽
     ScriptApp.newTrigger('handleDropdownEdit')
       .forSpreadsheet(ss).onEdit().create();
@@ -59,6 +69,21 @@ function setupDailyTrigger() {
 // ⚠️ 舊版曾在此定義 recordTaiwanStock(){ recordTaiwanStock(ss) }，會蓋掉
 //    「台美股紀錄.js」的實作並造成 Maximum call stack size exceeded。
 // ============================================================================
+
+// 定時觸發入口：不依賴 UI，結果寫入執行記錄
+function sendDailyBriefingScheduled() {
+  var day = new Date().getDay();
+  if (day === 0 || day === 6) return; // 週末休市不發盤後速報
+  Logger.log(JSON.stringify(sendDailyBriefing(SpreadsheetApp.getActiveSpreadsheet())));
+}
+
+function sendWeeklyDeepReportScheduled() {
+  Logger.log(JSON.stringify(sendWeeklyDeepReport(SpreadsheetApp.getActiveSpreadsheet())));
+}
+
+function sendMonthlyDeepReportScheduled() {
+  Logger.log(JSON.stringify(sendMonthlyDeepReport(SpreadsheetApp.getActiveSpreadsheet())));
+}
 
 function sendDailyBriefingMenu() {
   runWithAccessCheck_(function() {
