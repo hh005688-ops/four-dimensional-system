@@ -63,6 +63,18 @@ function recordTaiwanStockImpl_(sheetIdentifier) {
     return { success: false, message: "⏸️ 今天是週末（休市），未執行台股快照。" };
   }
   
+  // 🛡️ 國定假日／補假／颱風假休市過濾：A12（加權指數今日漲跌）為數字且剛好等於 0 才視為休市
+  //    空白、錯誤值（#N/A）或載入中先 flush 並稍等再讀一次，仍讀不到就照常記錄
+  var marketChange = sheet.getRange("A12").getValue();
+  if (typeof marketChange !== 'number' || !isFinite(marketChange)) {
+    SpreadsheetApp.flush();
+    Utilities.sleep(3000);
+    marketChange = sheet.getRange("A12").getValue();
+  }
+  if (typeof marketChange === 'number' && marketChange === 0) {
+    return { success: true, message: "今日台股休市，已跳過快照" };
+  }
+
   // ⭐️ 強制先更新公式，避免讀到載入中的 0
   SpreadsheetApp.flush();
 
