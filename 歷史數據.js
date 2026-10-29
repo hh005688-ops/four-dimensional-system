@@ -348,46 +348,89 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
 
 /**
  * 📒 把本次 Beta 結果寫入「Beta紀錄」分頁（不存在會自動建立）
- * 欄位：日期、區域、標的、1Y Beta、6M Beta、差值(1Y-6M)
- * 同一天重複刷新：先刪掉當天舊紀錄再寫入，只保留當天最後一次
+ * 版面：台股在 A~E 欄、美股在 G~K 欄（F 欄空白隔開），兩邊各自往下累積
+ * 每個區塊欄位：日期、標的、1Y Beta、6M Beta、差值(1Y-6M)
+ * 同一天重複刷新：只覆蓋該區塊當天的舊紀錄，只保留當天最後一次
  */
 function appendBetaLog_(ss, rows) {
   if (!rows || rows.length === 0) return;
 
   var LOG_SHEET = "Beta紀錄";
+  var BLOCK_COLS = 5;
+  var blocks = [
+    { region: "台股", col: 1, title: "台股標的" },
+    { region: "美股", col: 7, title: "美股標的" }
+  ];
+
   var sheet = ss.getSheetByName(LOG_SHEET);
+  var needInit = false;
+
   if (!sheet) {
     var prevSheet = null;
     try { prevSheet = ss.getActiveSheet(); } catch (e0) {}
     sheet = ss.insertSheet(LOG_SHEET);
     try { if (prevSheet) ss.setActiveSheet(prevSheet); } catch (e1) {} // 畫面留在原本的分頁
-    sheet.getRange(1, 1, 1, 6).setValues([["日期", "區域", "標的", "1Y Beta", "6M Beta", "差值(1Y-6M)"]]);
-    sheet.getRange("A:A").setNumberFormat("@"); // 日期用純文字，避免被轉成日期格式
+    needInit = true;
+  } else if (String(sheet.getRange("B1").getValue()).trim() === "區域") {
+    // 舊版版面（單一區塊、有「區域」欄）→ 重建成新版面
+    sheet.clear();
+    needInit = true;
+  }
+
+  if (needInit) {
+    for (var h = 0; h < blocks.length; h++) {
+      sheet.getRange(1, blocks[h].col, 1, BLOCK_COLS)
+        .setValues([["日期", blocks[h].title, "1Y Beta", "6M Beta", "差值(1Y-6M)"]]);
+    }
     sheet.setFrozenRows(1);
   }
 
   var tz = ss.getSpreadsheetTimeZone() || "Asia/Taipei";
   var today = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd");
 
-  // 刪除當天舊紀錄（由下往上刪）
-  var lastRow = sheet.getLastRow();
-  if (lastRow >= 2) {
-    var dates = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-    for (var d = dates.length - 1; d >= 0; d--) {
-      var v = dates[d][0];
-      var s = (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : String(v).trim();
-      if (s === today) sheet.deleteRow(d + 2);
+  for (var b = 0; b < blocks.length; b++) {
+    var blk = blocks[b];
+    var blockRows = [];
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i][0] === blk.region) blockRows.push(rows[i]);
     }
-  }
+    if (blockRows.length === 0) continue; // 這個區塊本次沒有資料，保持原樣
 
-  var out = [];
-  for (var i = 0; i < rows.length; i++) {
-    var b1 = Number(rows[i][2]) || 0;
-    var b6 = Number(rows[i][3]) || 0;
-    out.push([today, rows[i][0], rows[i][1], b1, b6, Math.round((b1 - b6) * 100) / 100]);
+    var maxRows = sheet.getMaxRows();
+    var bodyRows = Math.max(maxRows - 1, 1);
+
+    // 日期與代號欄用純文字（避免 00926 掉 0、日期被轉格式）；Beta 欄顯示 2 位小數
+    sheet.getRange(2, blk.col, bodyRows, 2).setNumberFormat("@");
+    sheet.getRange(2, blk.col + 2, bodyRows, 3).setNumberFormat("0.00");
+
+    // 讀出該區塊既有紀錄，去掉當天舊的，再接上本次
+    var existing = sheet.getRange(2, blk.col, bodyRows, BLOCK_COLS).getValues();
+    var kept = [];
+    for (var r = 0; r < existing.length; r++) {
+      var v = existing[r][0];
+      if (v === "" || v === null) continue;
+      var ds = (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : String(v).trim();
+      if (ds === today) continue;
+      existing[r][0] = ds;
+      kept.push(existing[r]);
+    }
+    for (var k = 0; k < blockRows.length; k++) {
+      var b1 = Number(blockRows[k][2]) || 0;
+      var b6 = Number(blockRows[k][3]) || 0;
+      kept.push([today, String(blockRows[k][1]), b1, b6, Math.round((b1 - b6) * 100) / 100]);
+    }
+
+    // 空間不夠就先往下加列
+    if (kept.length > bodyRows) {
+      sheet.insertRowsAfter(maxRows, kept.length - bodyRows + 200);
+      var newBody = sheet.getMaxRows() - 1;
+      sheet.getRange(2, blk.col, newBody, 2).setNumberFormat("@");
+      sheet.getRange(2, blk.col + 2, newBody, 3).setNumberFormat("0.00");
+    }
+
+    sheet.getRange(2, blk.col, bodyRows, BLOCK_COLS).clearContent();
+    sheet.getRange(2, blk.col, kept.length, BLOCK_COLS).setValues(kept);
   }
-  var startRow = sheet.getLastRow() + 1;
-  sheet.getRange(startRow, 1, out.length, 6).setValues(out);
 }
 
 /**
