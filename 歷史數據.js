@@ -213,7 +213,7 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
     var denominator = (count * sumX2 - sumX * sumX);
     if (denominator === 0) return 0;
     var slope = (count * sumXY - sumX * sumY) / denominator;
-    return Math.round(slope * 10) / 10;
+    return Math.round(slope * 100) / 100;
   }
 
   // 🇹🇼 台股區計算回寫
@@ -249,11 +249,11 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
 
     twSheet.getRange("L2:L7").setValues(twBetaWrites);
 
-    var overallTwBeta = totalTwMarketVal > 0 ? Math.round((weightedTwBetaSum / totalTwMarketVal) * 10) / 10 : 0;
+    var overallTwBeta = totalTwMarketVal > 0 ? Math.round((weightedTwBetaSum / totalTwMarketVal) * 100) / 100 : 0;
     twSheet.getRange("C10").setValue(overallTwBeta);
 
     // 6M Beta (半年線)：E11 標題、E12 結果；F11 標題、F12 差值 (1Y - 6M，用公式)
-    var overallTwBeta6m = totalTwMarketVal > 0 ? Math.round((weightedTwBeta6mSum / totalTwMarketVal) * 10) / 10 : 0;
+    var overallTwBeta6m = totalTwMarketVal > 0 ? Math.round((weightedTwBeta6mSum / totalTwMarketVal) * 100) / 100 : 0;
     twSheet.getRange("E11").setValue("6M Beta");
     twSheet.getRange("E12").setValue(overallTwBeta6m);
     twSheet.getRange("F11").setValue("1Y-6M 差值");
@@ -296,11 +296,11 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
 
     usSheet.getRange("L2:L7").setValues(usBetaWrites);
 
-    var overallUsBeta = totalUsMarketVal > 0 ? Math.round((weightedUsBetaSum / totalUsMarketVal) * 10) / 10 : 0;
+    var overallUsBeta = totalUsMarketVal > 0 ? Math.round((weightedUsBetaSum / totalUsMarketVal) * 100) / 100 : 0;
     usSheet.getRange("C10").setValue(overallUsBeta);
 
     // 6M Beta (半年線)：E11 標題、E12 結果；F11 標題、F12 差值 (1Y - 6M，用公式)
-    var overallUsBeta6m = totalUsMarketVal > 0 ? Math.round((weightedUsBeta6mSum / totalUsMarketVal) * 10) / 10 : 0;
+    var overallUsBeta6m = totalUsMarketVal > 0 ? Math.round((weightedUsBeta6mSum / totalUsMarketVal) * 100) / 100 : 0;
     usSheet.getRange("E11").setValue("6M Beta");
     usSheet.getRange("E12").setValue(overallUsBeta6m);
     usSheet.getRange("F11").setValue("1Y-6M 差值");
