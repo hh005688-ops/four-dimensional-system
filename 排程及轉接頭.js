@@ -25,7 +25,7 @@ function setupDailyTrigger() {
   runWithAccessCheck_(function() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    const targetFunctions = ['recordDailySnapshot', 'recordTaiwanStock', 'recordUSStock', 'handleDropdownEdit'];
+    const targetFunctions = ['recordDailySnapshot', 'recordTaiwanStock', 'recordUSStock', 'recordBetaHistory', 'handleDropdownEdit'];
     const triggers = ScriptApp.getUserTriggers(ss);
     
     for (var i = 0; i < triggers.length; i++) {
@@ -45,6 +45,10 @@ function setupDailyTrigger() {
     // 每日總覽快照排程
     ScriptApp.newTrigger('recordDailySnapshot')
       .timeBased().everyDays(1).atHour(14).nearMinute(15).create();
+
+    // Beta 刷新並記錄排程 (台股收盤、總覽快照之後，週末自動略過)
+    ScriptApp.newTrigger('recordBetaHistory')
+      .timeBased().everyDays(1).atHour(14).nearMinute(30).create();
 
     // 編輯觸發監聽
     ScriptApp.newTrigger('handleDropdownEdit')

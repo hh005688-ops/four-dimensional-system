@@ -193,6 +193,18 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
   var HALF_YEAR_DAYS = 183;
   var halfStartRow = Math.max(0, rawData.length - HALF_YEAR_DAYS);
 
+  // 📒 Beta 紀錄：蒐集本次結果，最後一次寫入「Beta紀錄」分頁
+  var betaLog = [];
+  // 大盤資料太少（例如 GoogleFinance 還沒載入完）就不記錄，避免記到 0 的假資料
+  function countValidBench(benchIdx) {
+    var n = 0;
+    for (var k = 0; k < rawData.length; k++) {
+      if (rawData[k][benchIdx] !== "" && !isNaN(Number(rawData[k][benchIdx]))) n++;
+    }
+    return n;
+  }
+  var MIN_VALID_BENCH_ROWS = 60;
+
   function calculateSlope(stockIdx, benchIdx, startRow) {
     if (stockIdx === undefined || benchIdx === undefined) return 0;
     var sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, count = 0;
@@ -225,6 +237,7 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
     var totalTwMarketVal = 0;
     var weightedTwBetaSum = 0;
     var weightedTwBeta6mSum = 0;
+    var twLog = [];
 
     for (var i = 0; i < twStockCodes.length; i++) {
       var code = String(twStockCodes[i][0] || "").trim().toUpperCase();
@@ -245,6 +258,7 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
 
       var beta6m = (cIdx !== undefined) ? calculateSlope(cIdx, twBenchIdx, halfStartRow) : 0;
       weightedTwBeta6mSum += beta6m * mVal;
+      twLog.push(["台股", code, beta, beta6m]);
     }
 
     twSheet.getRange("L2:L7").setValues(twBetaWrites);
@@ -258,6 +272,11 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
     twSheet.getRange("E12").setValue(overallTwBeta6m);
     twSheet.getRange("F11").setValue("1Y-6M 差值");
     twSheet.getRange("F12").setFormula("=C10-E12");
+
+    twLog.push(["台股", "整體", overallTwBeta, overallTwBeta6m]);
+    if (countValidBench(twBenchIdx) >= MIN_VALID_BENCH_ROWS) {
+      betaLog = betaLog.concat(twLog);
+    }
 
     var twTodayRet = Number(twSheet.getRange("E10").getValue()) || 0;
     var twBenchTodayRet = Number(twSheet.getRange("A12").getValue()) || 0;
@@ -274,6 +293,7 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
     var totalUsMarketVal = 0;
     var weightedUsBetaSum = 0;
     var weightedUsBeta6mSum = 0;
+    var usLog = [];
 
     for (var j = 0; j < usStockCodes.length; j++) {
       var uCode = String(usStockCodes[j][0] || "").trim().toUpperCase();
@@ -292,6 +312,7 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
 
       var uBeta6m = (uIdx !== undefined) ? calculateSlope(uIdx, usBenchIdx, halfStartRow) : 0;
       weightedUsBeta6mSum += uBeta6m * uVal;
+      usLog.push(["美股", uCode, uBeta, uBeta6m]);
     }
 
     usSheet.getRange("L2:L7").setValues(usBetaWrites);
@@ -306,11 +327,81 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
     usSheet.getRange("F11").setValue("1Y-6M 差值");
     usSheet.getRange("F12").setFormula("=C10-E12");
 
+    usLog.push(["美股", "整體", overallUsBeta, overallUsBeta6m]);
+    if (countValidBench(usBenchIdx) >= MIN_VALID_BENCH_ROWS) {
+      betaLog = betaLog.concat(usLog);
+    }
+
     var usTodayRet = Number(usSheet.getRange("E10").getValue()) || 0;
     var usBenchTodayRet = Number(rawData[rawData.length - 1][usBenchIdx]) || 0;
     var usAlpha = Math.round((usTodayRet - (overallUsBeta * usBenchTodayRet)) * 100) / 100;
     usSheet.getRange("G10").setValue(usAlpha);
   }
+
+  // 📒 寫入 Beta 紀錄（失敗也不影響上面的刷新結果）
+  try {
+    appendBetaLog_(ss, betaLog);
+  } catch (e) {
+    Logger.log("⚠️ Beta 紀錄寫入失敗：" + e.message);
+  }
+}
+
+/**
+ * 📒 把本次 Beta 結果寫入「Beta紀錄」分頁（不存在會自動建立）
+ * 欄位：日期、區域、標的、1Y Beta、6M Beta、差值(1Y-6M)
+ * 同一天重複刷新：先刪掉當天舊紀錄再寫入，只保留當天最後一次
+ */
+function appendBetaLog_(ss, rows) {
+  if (!rows || rows.length === 0) return;
+
+  var LOG_SHEET = "Beta紀錄";
+  var sheet = ss.getSheetByName(LOG_SHEET);
+  if (!sheet) {
+    var prevSheet = null;
+    try { prevSheet = ss.getActiveSheet(); } catch (e0) {}
+    sheet = ss.insertSheet(LOG_SHEET);
+    try { if (prevSheet) ss.setActiveSheet(prevSheet); } catch (e1) {} // 畫面留在原本的分頁
+    sheet.getRange(1, 1, 1, 6).setValues([["日期", "區域", "標的", "1Y Beta", "6M Beta", "差值(1Y-6M)"]]);
+    sheet.getRange("A:A").setNumberFormat("@"); // 日期用純文字，避免被轉成日期格式
+    sheet.setFrozenRows(1);
+  }
+
+  var tz = ss.getSpreadsheetTimeZone() || "Asia/Taipei";
+  var today = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd");
+
+  // 刪除當天舊紀錄（由下往上刪）
+  var lastRow = sheet.getLastRow();
+  if (lastRow >= 2) {
+    var dates = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var d = dates.length - 1; d >= 0; d--) {
+      var v = dates[d][0];
+      var s = (v instanceof Date) ? Utilities.formatDate(v, tz, "yyyy-MM-dd") : String(v).trim();
+      if (s === today) sheet.deleteRow(d + 2);
+    }
+  }
+
+  var out = [];
+  for (var i = 0; i < rows.length; i++) {
+    var b1 = Number(rows[i][2]) || 0;
+    var b6 = Number(rows[i][3]) || 0;
+    out.push([today, rows[i][0], rows[i][1], b1, b6, Math.round((b1 - b6) * 100) / 100]);
+  }
+  var startRow = sheet.getLastRow() + 1;
+  sheet.getRange(startRow, 1, out.length, 6).setValues(out);
+}
+
+/**
+ * ⏰ 排程用：收盤後自動刷新 Beta 並記錄（週六、週日不執行）
+ */
+function recordBetaHistory() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tz = ss.getSpreadsheetTimeZone() || "Asia/Taipei";
+  var dow = Number(Utilities.formatDate(new Date(), tz, "u")); // 1=週一 ... 7=週日
+  if (dow >= 6) {
+    Logger.log("週末不刷新 Beta 紀錄");
+    return;
+  }
+  syncOneYearHistory(ss);
 }
 
 /**
