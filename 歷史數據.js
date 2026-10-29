@@ -189,11 +189,15 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
     if (h) colMap[h] = c;
   }
 
-  function calculateSlope(stockIdx, benchIdx) {
+  // 半年線 (6M)：只取最近 183 天（歷史表是逐日日曆列，年線為 365 列）
+  var HALF_YEAR_DAYS = 183;
+  var halfStartRow = Math.max(0, rawData.length - HALF_YEAR_DAYS);
+
+  function calculateSlope(stockIdx, benchIdx, startRow) {
     if (stockIdx === undefined || benchIdx === undefined) return 0;
     var sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, count = 0;
 
-    for (var r = 0; r < rawData.length; r++) {
+    for (var r = (startRow || 0); r < rawData.length; r++) {
       var y = Number(rawData[r][stockIdx]);
       var x = Number(rawData[r][benchIdx]);
 
@@ -220,6 +224,7 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
     var twBetaWrites = [];
     var totalTwMarketVal = 0;
     var weightedTwBetaSum = 0;
+    var weightedTwBeta6mSum = 0;
 
     for (var i = 0; i < twStockCodes.length; i++) {
       var code = String(twStockCodes[i][0] || "").trim().toUpperCase();
@@ -237,12 +242,22 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
       var beta = (cIdx !== undefined) ? calculateSlope(cIdx, twBenchIdx) : 0;
       twBetaWrites.push([beta]);
       weightedTwBetaSum += beta * mVal;
+
+      var beta6m = (cIdx !== undefined) ? calculateSlope(cIdx, twBenchIdx, halfStartRow) : 0;
+      weightedTwBeta6mSum += beta6m * mVal;
     }
 
     twSheet.getRange("L2:L7").setValues(twBetaWrites);
 
     var overallTwBeta = totalTwMarketVal > 0 ? Math.round((weightedTwBetaSum / totalTwMarketVal) * 10) / 10 : 0;
     twSheet.getRange("C10").setValue(overallTwBeta);
+
+    // 6M Beta (半年線)：E11 標題、E12 結果；F11 標題、F12 差值 (1Y - 6M，用公式)
+    var overallTwBeta6m = totalTwMarketVal > 0 ? Math.round((weightedTwBeta6mSum / totalTwMarketVal) * 10) / 10 : 0;
+    twSheet.getRange("E11").setValue("6M Beta");
+    twSheet.getRange("E12").setValue(overallTwBeta6m);
+    twSheet.getRange("F11").setValue("1Y-6M 差值");
+    twSheet.getRange("F12").setFormula("=C10-E12");
 
     var twTodayRet = Number(twSheet.getRange("E10").getValue()) || 0;
     var twBenchTodayRet = Number(twSheet.getRange("A12").getValue()) || 0;
@@ -258,6 +273,7 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
     var usBetaWrites = [];
     var totalUsMarketVal = 0;
     var weightedUsBetaSum = 0;
+    var weightedUsBeta6mSum = 0;
 
     for (var j = 0; j < usStockCodes.length; j++) {
       var uCode = String(usStockCodes[j][0] || "").trim().toUpperCase();
@@ -273,12 +289,22 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
       var uBeta = (uIdx !== undefined) ? calculateSlope(uIdx, usBenchIdx) : 0;
       usBetaWrites.push([uBeta]);
       weightedUsBetaSum += uBeta * uVal;
+
+      var uBeta6m = (uIdx !== undefined) ? calculateSlope(uIdx, usBenchIdx, halfStartRow) : 0;
+      weightedUsBeta6mSum += uBeta6m * uVal;
     }
 
     usSheet.getRange("L2:L7").setValues(usBetaWrites);
 
     var overallUsBeta = totalUsMarketVal > 0 ? Math.round((weightedUsBetaSum / totalUsMarketVal) * 10) / 10 : 0;
     usSheet.getRange("C10").setValue(overallUsBeta);
+
+    // 6M Beta (半年線)：E11 標題、E12 結果；F11 標題、F12 差值 (1Y - 6M，用公式)
+    var overallUsBeta6m = totalUsMarketVal > 0 ? Math.round((weightedUsBeta6mSum / totalUsMarketVal) * 10) / 10 : 0;
+    usSheet.getRange("E11").setValue("6M Beta");
+    usSheet.getRange("E12").setValue(overallUsBeta6m);
+    usSheet.getRange("F11").setValue("1Y-6M 差值");
+    usSheet.getRange("F12").setFormula("=C10-E12");
 
     var usTodayRet = Number(usSheet.getRange("E10").getValue()) || 0;
     var usBenchTodayRet = Number(rawData[rawData.length - 1][usBenchIdx]) || 0;
