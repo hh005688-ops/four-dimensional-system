@@ -26,6 +26,9 @@ function runDailyRecord() {
   syncOneYearHistory(ss);
 }
 
+// 📌 正二觀察清單（只用來比較 Beta 穩定度，不影響持倉、整體 Beta 與佔比）
+var ETF2X_WATCH = ["00631L", "00663L", "00675L", "00685L"];
+
 /**
  * 歷史價格與公式注入（主動動態掃描台美股持倉，全自動重建後台欄位與 Beta）
  */
@@ -75,7 +78,15 @@ function syncOneYearHistory(ss) {
     }
   }
 
-  Logger.log("🔍 動態偵測到 " + stocks.length + " 支最新持倉標的：" + stocks.join(", "));
+  // 4. 觀察清單：台股正二（未持有也一併抓價格，供 Beta 穩定度比較；已在持倉中的不重複加入）
+  for (var w = 0; w < ETF2X_WATCH.length; w++) {
+    var watchTicker = "TPE:" + ETF2X_WATCH[w];
+    if (stocks.indexOf(watchTicker) === -1) {
+      stocks.push(watchTicker);
+    }
+  }
+
+  Logger.log("🔍 動態偵測到 " + stocks.length + " 支標的（含觀察清單）：" + stocks.join(", "));
 
   var maxCols = dataSheet.getMaxColumns();
   var maxRows = dataSheet.getMaxRows();
@@ -204,6 +215,15 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
     return n;
   }
   var MIN_VALID_BENCH_ROWS = 60;
+  // 標的與大盤「同一天都有報酬率」的筆數
+  function countValidPairs(stockIdx, benchIdx, startRow) {
+    var n = 0;
+    for (var k = (startRow || 0); k < rawData.length; k++) {
+      var sv = rawData[k][stockIdx], bv = rawData[k][benchIdx];
+      if (sv !== "" && bv !== "" && !isNaN(Number(sv)) && !isNaN(Number(bv))) n++;
+    }
+    return n;
+  }
 
   function calculateSlope(stockIdx, benchIdx, startRow) {
     if (stockIdx === undefined || benchIdx === undefined) return 0;
@@ -338,6 +358,21 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
     usSheet.getRange("G10").setValue(usAlpha);
   }
 
+  // 🔬 正二觀察清單：只記錄 Beta（對加權指數），不寫回任何分頁、不影響整體 Beta
+  var watchLog = [];
+  for (var wi = 0; wi < ETF2X_WATCH.length; wi++) {
+    var wIdx = colMap["TPE:" + ETF2X_WATCH[wi] + " 報酬率"];
+    if (wIdx === undefined) continue;
+    // 有效資料太少（例如 GoogleFinance 抓不到該代號）就不記錄，避免記到 0 的假資料
+    if (countValidPairs(wIdx, twBenchIdx, 0) < 60) continue;
+    watchLog.push(["正二", ETF2X_WATCH[wi],
+      calculateSlope(wIdx, twBenchIdx),
+      calculateSlope(wIdx, twBenchIdx, halfStartRow)]);
+  }
+  if (watchLog.length > 0 && countValidBench(twBenchIdx) >= MIN_VALID_BENCH_ROWS) {
+    betaLog = betaLog.concat(watchLog);
+  }
+
   // 📒 寫入 Beta 紀錄（失敗也不影響上面的刷新結果）
   try {
     appendBetaLog_(ss, betaLog);
@@ -359,7 +394,8 @@ function appendBetaLog_(ss, rows) {
   var BLOCK_COLS = 5;
   var blocks = [
     { region: "台股", col: 1, title: "台股標的" },
-    { region: "美股", col: 7, title: "美股標的" }
+    { region: "美股", col: 7, title: "美股標的" },
+    { region: "正二", col: 13, title: "正二標的" }
   ];
 
   var sheet = ss.getSheetByName(LOG_SHEET);
@@ -377,13 +413,14 @@ function appendBetaLog_(ss, rows) {
     needInit = true;
   }
 
-  if (needInit) {
-    for (var h = 0; h < blocks.length; h++) {
+  // 標題列：缺哪個區塊就補哪個（既有區塊不動，保留你自己設的顏色）
+  for (var h = 0; h < blocks.length; h++) {
+    if (String(sheet.getRange(1, blocks[h].col).getValue()).trim() === "") {
       sheet.getRange(1, blocks[h].col, 1, BLOCK_COLS)
         .setValues([["日期", blocks[h].title, "1Y Beta", "6M Beta", "差值(1Y-6M)"]]);
     }
-    sheet.setFrozenRows(1);
   }
+  if (needInit) sheet.setFrozenRows(1);
 
   var tz = ss.getSpreadsheetTimeZone() || "Asia/Taipei";
   var today = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd");
