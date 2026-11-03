@@ -1,8 +1,8 @@
 /**
  * 📈 正二 ETF 折溢價紀錄
  * 把今天的折溢價(%)寫進「Beta紀錄」分頁的 R 欄（對應 M~Q 欄那 4 檔正二）
- * 資料來源：證交所公開的 ETF 即時資料（all_etf.txt）
- * 折溢價(%) = (成交價 ÷ 預估淨值 − 1) × 100
+ * 資料來源：鉅亨網「淨值與折溢價」頁面
+ * 折溢價(%) = (市價 ÷ 淨值 − 1) × 100
  * 失敗時只記 Log，不會影響原本的 Beta 紀錄
  */
 function appendPremiumLog_(ss) {
@@ -44,50 +44,55 @@ function appendPremiumLog_(ss) {
 }
 
 /**
- * 從證交所抓 ETF 資料，回傳 { "00631L": 0.15, ... }（單位 %）
+ * 從鉅亨網「淨值與折溢價」頁面抓 ETF 資料，回傳 { "00631L": 0.45, ... }（單位 %）
+ * 表格每列的順序：代碼、名稱、市價、漲跌、淨值、漲跌、折溢價(元)、折溢價(%)
+ * 折溢價(%) = (市價 ÷ 淨值 − 1) × 100，正數 = 溢價、負數 = 折價
  */
 function fetchEtfPremiums_(codes) {
   var result = {};
   try {
-    var res = UrlFetchApp.fetch("https://mis.twse.com.tw/stock/data/all_etf.txt", {
+    var res = UrlFetchApp.fetch("https://www.cnyes.com/twstock/etf/detail/discount-premium", {
       method: "get",
       muteHttpExceptions: true,
-      headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" }
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+        "Accept-Language": "zh-TW,zh;q=0.9"
+      }
     });
     if (res.getResponseCode() !== 200) {
       Logger.log("⚠️ 折溢價來源回應異常：" + res.getResponseCode());
       return result;
     }
-    var json = JSON.parse(res.getContentText());
+    var html = res.getContentText();
 
-    function walk(node) {
-      if (Array.isArray(node)) {
-        for (var n = 0; n < node.length; n++) walk(node[n]);
-      } else if (node && typeof node === "object") {
-        if (node.a !== undefined && node.e !== undefined && node.f !== undefined) {
-          handle(node);
-        } else {
-          for (var key in node) walk(node[key]);
-        }
+    for (var c = 0; c < codes.length; c++) {
+      var code = String(codes[c]).toUpperCase();
+      var at = html.indexOf(">" + code + "<");
+      if (at === -1) {
+        Logger.log("⚠️ 折溢價頁面找不到 " + code);
+        continue;
       }
-    }
+      var end = html.indexOf("</tr>", at);
+      var rowHtml = html.substring(at, end === -1 ? at + 6000 : end);
 
-    function handle(item) {
-      var code = String(item.a).trim().toUpperCase();
-      if (codes.indexOf(code) === -1) return;
-      var price = Number(item.e);
-      var nav = Number(item.f);
+      // 取出這一列所有的文字格：[代碼, 名稱, 市價, 漲跌, 淨值, 漲跌, 折溢價(元), 折溢價(%)...]
+      var cells = [];
+      var re = />([^<>]+)</g, m;
+      while ((m = re.exec(rowHtml)) !== null) {
+        var t = m[1].trim();
+        if (t !== "") cells.push(t);
+      }
+      var price = Number(String(cells[2]).replace(/,/g, ""));
+      var nav = Number(String(cells[4]).replace(/,/g, ""));
       var p;
       if (price > 0 && nav > 0) {
         p = (price / nav - 1) * 100;
       } else {
-        p = Number(item.g);   // 退而求其次：直接用來源給的折溢價欄位
+        p = Number(String(cells[6]).replace(/[%+,]/g, ""));   // 退而求其次：直接讀頁面上的 %
       }
       if (!isNaN(p)) result[code] = Math.round(p * 100) / 100;
-      Logger.log("折溢價原始資料 " + code + "：" + JSON.stringify(item));
+      Logger.log("折溢價原始資料 " + code + "：" + JSON.stringify(cells.slice(0, 8)));
     }
-
-    walk(json);
   } catch (e) {
     Logger.log("⚠️ 折溢價抓取失敗：" + e.message);
   }
