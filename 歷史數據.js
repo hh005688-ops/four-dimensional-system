@@ -360,6 +360,7 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
 
   // 🔬 正二觀察清單：只記錄 Beta（對加權指數），不寫回任何分頁、不影響整體 Beta
   var watchLog = [];
+  var premiumMap = fetchEtfPremiumMap_(); // 代號 → 折溢價(%)，抓不到的代號沒有值
   for (var wi = 0; wi < ETF2X_WATCH.length; wi++) {
     var wIdx = colMap["TPE:" + ETF2X_WATCH[wi] + " 報酬率"];
     if (wIdx === undefined) continue;
@@ -367,7 +368,8 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
     if (countValidPairs(wIdx, twBenchIdx, 0) < 60) continue;
     watchLog.push(["正二", ETF2X_WATCH[wi],
       calculateSlope(wIdx, twBenchIdx),
-      calculateSlope(wIdx, twBenchIdx, halfStartRow)]);
+      calculateSlope(wIdx, twBenchIdx, halfStartRow),
+      (premiumMap[ETF2X_WATCH[wi]] !== undefined) ? premiumMap[ETF2X_WATCH[wi]] : ""]);
   }
   if (watchLog.length > 0 && countValidBench(twBenchIdx) >= MIN_VALID_BENCH_ROWS) {
     betaLog = betaLog.concat(watchLog);
@@ -391,11 +393,11 @@ function appendBetaLog_(ss, rows) {
   if (!rows || rows.length === 0) return;
 
   var LOG_SHEET = "Beta紀錄";
-  var BLOCK_COLS = 5;
+  // width：區塊欄數。正二多一欄「折溢價(%)」（R 欄），其餘維持 5 欄
   var blocks = [
-    { region: "台股", col: 1, title: "台股標的" },
-    { region: "美股", col: 7, title: "美股標的" },
-    { region: "正二", col: 13, title: "正二標的" }
+    { region: "台股", col: 1, title: "台股標的", width: 5 },
+    { region: "美股", col: 7, title: "美股標的", width: 5 },
+    { region: "正二", col: 13, title: "正二標的", width: 6 }
   ];
 
   var sheet = ss.getSheetByName(LOG_SHEET);
@@ -416,8 +418,12 @@ function appendBetaLog_(ss, rows) {
   // 標題列：缺哪個區塊就補哪個（既有區塊不動，保留你自己設的顏色）
   for (var h = 0; h < blocks.length; h++) {
     if (String(sheet.getRange(1, blocks[h].col).getValue()).trim() === "") {
-      sheet.getRange(1, blocks[h].col, 1, BLOCK_COLS)
+      sheet.getRange(1, blocks[h].col, 1, 5)
         .setValues([["日期", blocks[h].title, "1Y Beta", "6M Beta", "差值(1Y-6M)"]]);
+    }
+    // 正二區塊的第 6 欄：折溢價(%)（已有表頭就不動）
+    if (blocks[h].width >= 6 && String(sheet.getRange(1, blocks[h].col + 5).getValue()).trim() === "") {
+      sheet.getRange(1, blocks[h].col + 5).setValue("折溢價(%)");
     }
   }
   if (needInit) sheet.setFrozenRows(1);
@@ -438,10 +444,10 @@ function appendBetaLog_(ss, rows) {
 
     // 日期與代號欄用純文字（避免 00926 掉 0、日期被轉格式）；Beta 欄顯示 2 位小數
     sheet.getRange(2, blk.col, bodyRows, 2).setNumberFormat("@");
-    sheet.getRange(2, blk.col + 2, bodyRows, 3).setNumberFormat("0.00");
+    sheet.getRange(2, blk.col + 2, bodyRows, blk.width - 2).setNumberFormat("0.00");
 
     // 讀出該區塊既有紀錄，去掉當天舊的，再接上本次
-    var existing = sheet.getRange(2, blk.col, bodyRows, BLOCK_COLS).getValues();
+    var existing = sheet.getRange(2, blk.col, bodyRows, blk.width).getValues();
     var kept = [];
     for (var r = 0; r < existing.length; r++) {
       var v = existing[r][0];
@@ -454,7 +460,12 @@ function appendBetaLog_(ss, rows) {
     for (var k = 0; k < blockRows.length; k++) {
       var b1 = Number(blockRows[k][2]) || 0;
       var b6 = Number(blockRows[k][3]) || 0;
-      kept.push([today, String(blockRows[k][1]), b1, b6, Math.round((b1 - b6) * 100) / 100]);
+      var outRow = [today, String(blockRows[k][1]), b1, b6, Math.round((b1 - b6) * 100) / 100];
+      if (blk.width >= 6) {
+        var prem = blockRows[k][4]; // 折溢價(%)；抓不到就留空白，不寫 0 的假資料
+        outRow.push((prem === undefined || prem === "" || isNaN(Number(prem))) ? "" : Number(prem));
+      }
+      kept.push(outRow);
     }
 
     // 空間不夠就先往下加列
@@ -462,12 +473,57 @@ function appendBetaLog_(ss, rows) {
       sheet.insertRowsAfter(maxRows, kept.length - bodyRows + 200);
       var newBody = sheet.getMaxRows() - 1;
       sheet.getRange(2, blk.col, newBody, 2).setNumberFormat("@");
-      sheet.getRange(2, blk.col + 2, newBody, 3).setNumberFormat("0.00");
+      sheet.getRange(2, blk.col + 2, newBody, blk.width - 2).setNumberFormat("0.00");
     }
 
-    sheet.getRange(2, blk.col, bodyRows, BLOCK_COLS).clearContent();
-    sheet.getRange(2, blk.col, kept.length, BLOCK_COLS).setValues(kept);
+    sheet.getRange(2, blk.col, bodyRows, blk.width).clearContent();
+    sheet.getRange(2, blk.col, kept.length, blk.width).setValues(kept);
   }
+}
+
+/**
+ * 📊 取得 ETF 折溢價(%)：證交所 MIS 的 ETF 清單（預估淨值、市價、折溢價）
+ * 回傳 { "00631L": 0.12, ... }（單位 %，正數溢價、負數折價）；任何錯誤回傳空物件，不影響 Beta 紀錄
+ * 欄位：a 代號、f 預估淨值、g 市價、h 折溢價(%)；若 h 缺值，改用 g/f-1 自算
+ */
+function fetchEtfPremiumMap_() {
+  var result = {};
+  try {
+    var res = UrlFetchApp.fetch("https://mis.twse.com.tw/stock/data/all_etf.txt", {
+      muteHttpExceptions: true,
+      headers: { "User-Agent": "Mozilla/5.0" }
+    });
+    if (res.getResponseCode() !== 200) {
+      Logger.log("⚠️ 折溢價來源 HTTP " + res.getResponseCode());
+      return result;
+    }
+    var data = JSON.parse(res.getContentText());
+    var list = [];
+    if (data && data.a1) list = data.a1; // 以「集合」分組的格式
+    else if (data && data.msgArray) list = data.msgArray;
+    // 可能是巢狀（每組內再有 msgArray）→ 攤平
+    var flat = [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && list[i].msgArray) flat = flat.concat(list[i].msgArray);
+      else flat.push(list[i]);
+    }
+    for (var j = 0; j < flat.length; j++) {
+      var it = flat[j];
+      if (!it) continue;
+      var code = String(it.a || "").trim().toUpperCase();
+      if (ETF2X_WATCH.indexOf(code) < 0) continue;
+      var p = parseFloat(String(it.h).replace("%", ""));
+      if (isNaN(p)) {
+        var nav = parseFloat(it.f), px = parseFloat(it.g);
+        if (!isNaN(nav) && !isNaN(px) && nav > 0) p = (px / nav - 1) * 100;
+      }
+      if (!isNaN(p)) result[code] = Math.round(p * 100) / 100;
+    }
+    if (Object.keys(result).length === 0) Logger.log("⚠️ 折溢價來源沒有找到正二標的，請檢查資料格式");
+  } catch (e) {
+    Logger.log("⚠️ 折溢價抓取失敗：" + e.message);
+  }
+  return result;
 }
 
 /**
