@@ -376,6 +376,7 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
   // 📒 寫入 Beta 紀錄（失敗也不影響上面的刷新結果）
   try {
     appendBetaLog_(ss, betaLog);
+    appendPremiumLog_(ss);
   } catch (e) {
     Logger.log("⚠️ Beta 紀錄寫入失敗：" + e.message);
   }
