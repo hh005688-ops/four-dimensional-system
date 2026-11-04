@@ -2,11 +2,11 @@
  * 📈 正二 ETF 折溢價紀錄（正式淨值版）
  *
  * 把折溢價(%)寫進「Beta紀錄」分頁的 R 欄（對應 M~Q 欄那 4 檔正二）
- * 資料來源：玩股網「折溢價」頁面（每天一筆：市價、正式淨值、折溢價）
- * 折溢價(%) = (市價 ÷ 正式淨值 − 1) × 100，正數 = 溢價、負數 = 折價
+ * 資料來源：MoneyDJ「近30日淨值」頁面（每天一筆：淨值、市價、折溢價）
+ * 折溢價(%) = (市價 ÷ 淨值 − 1) × 100，正數 = 溢價、負數 = 折價
  *
- * 注意：正式淨值要收盤後、晚上才會公布，所以「當天」的折溢價要等隔天才有。
- * 程式每次執行都會把 R 欄裡「日期有對上、而且玩股網已經有資料」的列補上，
+ * 注意：每天的正式淨值要收盤後、晚上才會公布，所以「當天」的折溢價要等隔天才有。
+ * 程式每次執行都會把 R 欄裡「日期有對上、而且 MoneyDJ 已經有資料」的列補上，
  * 所以不用特別改排程時間，晚一天的資料會自動補進去。
  * 當天那一列在正式淨值公布前會保持空白（不會放不準的數字）。
  * 失敗時只記 Log，不會影響原本的 Beta 紀錄。
@@ -66,7 +66,7 @@ function appendPremiumLog_(ss) {
 function fetchOfficialPremiums_(code) {
   var result = {};
   try {
-    var url = "https://www.wantgoo.com/stock/etf/" + String(code).toLowerCase() + "/discount-premium";
+    var url = "https://www.moneydj.com/etf/x/basic/basic0003.xdjhtm?etfid=" + String(code).toLowerCase() + ".tw";
     var res = UrlFetchApp.fetch(url, {
       method: "get",
       muteHttpExceptions: true,
@@ -95,8 +95,9 @@ function fetchOfficialPremiums_(code) {
 
 /**
  * 從頁面文字找出每一天的資料。
- * 每列的順序：日期、市價、淨值、折溢價(元)、折溢價(%)
- * 不依賴固定的網頁標籤，只看「日期 後面跟著 4 個數字再加一個 %」。
+ * 每列的順序：日期、淨值、市價、折溢價(%)
+ * 不依賴固定的網頁標籤，只看「日期 後面跟著 3 個數字」，
+ * 並且檢查「折溢價 = (市價 ÷ 淨值 − 1) × 100」有對上才收，讀錯的列會自動略過。
  */
 function parseOfficialPremiums_(html) {
   var out = {};
@@ -110,19 +111,20 @@ function parseOfficialPremiums_(html) {
   var num = "([+-]?[\\d,]*\\.?\\d+)";
   var sep = "[\\s|]+";
   var re = new RegExp(
-    "(\\d{4}[-/]\\d{2}[-/]\\d{2})" + sep + num + sep + num + sep + num + sep + "([+-]?[\\d,]*\\.?\\d+)\\s*%", "g");
+    "(\\d{4}[-/]\\d{2}[-/]\\d{2})" + sep + num + sep + num + sep + num + "\\s*%?", "g");
 
   var m;
   while ((m = re.exec(text)) !== null) {
     var date = m[1].replace(/\//g, "-");
     if (out[date] !== undefined) continue;   // 同一天只取第一筆
-    var price = Number(m[2].replace(/,/g, ""));
-    var nav = Number(m[3].replace(/,/g, ""));
-    var pct = Number(m[5].replace(/,/g, ""));
-    if (isNaN(pct)) {
-      if (!(price > 0 && nav > 0)) continue;
-      pct = (price / nav - 1) * 100;
-    }
+    var a = Number(m[2].replace(/,/g, ""));
+    var b = Number(m[3].replace(/,/g, ""));
+    var pct = Number(m[4].replace(/,/g, ""));
+    if (!(a > 0 && b > 0) || isNaN(pct)) continue;
+    // 驗算：折溢價要等於 (市價÷淨值−1)×100（欄位順序對調也能容許）
+    var ok = Math.abs((b / a - 1) * 100 - pct) <= 0.06 ||
+             Math.abs((a / b - 1) * 100 - pct) <= 0.06;
+    if (!ok) continue;
     out[date] = Math.round(pct * 100) / 100;
   }
   return out;
