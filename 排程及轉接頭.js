@@ -25,7 +25,7 @@ function setupDailyTrigger() {
   runWithAccessCheck_(function() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    const targetFunctions = ['recordDailySnapshot', 'recordTaiwanStock', 'recordUSStock', 'recordBetaHistory', 'handleDropdownEdit'];
+    const targetFunctions = ['recordDailySnapshot', 'recordTaiwanStock', 'recordUSStock', 'recordBetaHistory', 'backfillPremium', 'handleDropdownEdit'];
     const triggers = ScriptApp.getUserTriggers(ss);
     
     for (var i = 0; i < triggers.length; i++) {
@@ -50,12 +50,32 @@ function setupDailyTrigger() {
     ScriptApp.newTrigger('recordBetaHistory')
       .timeBased().everyDays(1).atHour(14).nearMinute(30).create();
 
+    // 正二折溢價補填排程 (晚上正式淨值公布後，只補 Beta紀錄 R 欄，不動 Beta)
+    ScriptApp.newTrigger('backfillPremium')
+      .timeBased().everyDays(1).atHour(21).nearMinute(0).create();
+
     // 編輯觸發監聽
     ScriptApp.newTrigger('handleDropdownEdit')
       .forSpreadsheet(ss).onEdit().create();
 
     ss.toast("🎉 本地端全自動排程與監聽已成功啟用！", "系統啟用成功", 6);
   });
+}
+
+/**
+ * 🌙 只安裝「晚上補填折溢價」這一個排程（不會動到其他排程）
+ * 在 Apps Script 編輯器選這個函式按「執行」一次即可；重複執行只會留一個。
+ */
+function installPremiumTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'backfillPremium') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  ScriptApp.newTrigger('backfillPremium')
+    .timeBased().everyDays(1).atHour(21).nearMinute(0).create();
+  Logger.log("✅ 已安裝：每天晚上 21:00 左右補填折溢價");
 }
 
 // ============================================================================
