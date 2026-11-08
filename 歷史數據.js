@@ -204,6 +204,10 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
   var HALF_YEAR_DAYS = 183;
   var halfStartRow = Math.max(0, rawData.length - HALF_YEAR_DAYS);
 
+  // 季線 (3M)：只取最近 92 天（同樣是逐日日曆列）
+  var THREE_MONTH_DAYS = 92;
+  var threeStartRow = Math.max(0, rawData.length - THREE_MONTH_DAYS);
+
   // 📒 Beta 紀錄：蒐集本次結果，最後一次寫入「Beta紀錄」分頁
   var betaLog = [];
   // 大盤資料太少（例如 GoogleFinance 還沒載入完）就不記錄，避免記到 0 的假資料
@@ -257,6 +261,7 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
     var totalTwMarketVal = 0;
     var weightedTwBetaSum = 0;
     var weightedTwBeta6mSum = 0;
+    var weightedTwBeta3mSum = 0;
     var twLog = [];
 
     for (var i = 0; i < twStockCodes.length; i++) {
@@ -278,7 +283,9 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
 
       var beta6m = (cIdx !== undefined) ? calculateSlope(cIdx, twBenchIdx, halfStartRow) : 0;
       weightedTwBeta6mSum += beta6m * mVal;
-      twLog.push(["台股", code, beta, beta6m]);
+      var beta3m = (cIdx !== undefined) ? calculateSlope(cIdx, twBenchIdx, threeStartRow) : 0;
+      weightedTwBeta3mSum += beta3m * mVal;
+      twLog.push(["台股", code, beta, beta6m, beta3m]);
     }
 
     twSheet.getRange("L2:L7").setValues(twBetaWrites);
@@ -293,7 +300,12 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
     twSheet.getRange("F11").setValue("1Y-6M 差值");
     twSheet.getRange("F12").setFormula("=C10-E12");
 
-    twLog.push(["台股", "整體", overallTwBeta, overallTwBeta6m]);
+    // 3M Beta (季線)：G11 標題、G12 結果（不影響上面的 1Y-6M 差值）
+    var overallTwBeta3m = totalTwMarketVal > 0 ? Math.round((weightedTwBeta3mSum / totalTwMarketVal) * 100) / 100 : 0;
+    twSheet.getRange("G11").setValue("3M Beta");
+    twSheet.getRange("G12").setValue(overallTwBeta3m);
+
+    twLog.push(["台股", "整體", overallTwBeta, overallTwBeta6m, overallTwBeta3m]);
     if (countValidBench(twBenchIdx) >= MIN_VALID_BENCH_ROWS) {
       betaLog = betaLog.concat(twLog);
     }
@@ -313,6 +325,7 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
     var totalUsMarketVal = 0;
     var weightedUsBetaSum = 0;
     var weightedUsBeta6mSum = 0;
+    var weightedUsBeta3mSum = 0;
     var usLog = [];
 
     for (var j = 0; j < usStockCodes.length; j++) {
@@ -332,7 +345,9 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
 
       var uBeta6m = (uIdx !== undefined) ? calculateSlope(uIdx, usBenchIdx, halfStartRow) : 0;
       weightedUsBeta6mSum += uBeta6m * uVal;
-      usLog.push(["美股", uCode, uBeta, uBeta6m]);
+      var uBeta3m = (uIdx !== undefined) ? calculateSlope(uIdx, usBenchIdx, threeStartRow) : 0;
+      weightedUsBeta3mSum += uBeta3m * uVal;
+      usLog.push(["美股", uCode, uBeta, uBeta6m, uBeta3m]);
     }
 
     usSheet.getRange("L2:L7").setValues(usBetaWrites);
@@ -347,7 +362,12 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
     usSheet.getRange("F11").setValue("1Y-6M 差值");
     usSheet.getRange("F12").setFormula("=C10-E12");
 
-    usLog.push(["美股", "整體", overallUsBeta, overallUsBeta6m]);
+    // 3M Beta (季線)：G11 標題、G12 結果（不影響上面的 1Y-6M 差值）
+    var overallUsBeta3m = totalUsMarketVal > 0 ? Math.round((weightedUsBeta3mSum / totalUsMarketVal) * 100) / 100 : 0;
+    usSheet.getRange("G11").setValue("3M Beta");
+    usSheet.getRange("G12").setValue(overallUsBeta3m);
+
+    usLog.push(["美股", "整體", overallUsBeta, overallUsBeta6m, overallUsBeta3m]);
     if (countValidBench(usBenchIdx) >= MIN_VALID_BENCH_ROWS) {
       betaLog = betaLog.concat(usLog);
     }
@@ -367,7 +387,8 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
     if (countValidPairs(wIdx, twBenchIdx, 0) < 60) continue;
     watchLog.push(["正二", ETF2X_WATCH[wi],
       calculateSlope(wIdx, twBenchIdx),
-      calculateSlope(wIdx, twBenchIdx, halfStartRow)]);
+      calculateSlope(wIdx, twBenchIdx, halfStartRow),
+      calculateSlope(wIdx, twBenchIdx, threeStartRow)]);
   }
   if (watchLog.length > 0 && countValidBench(twBenchIdx) >= MIN_VALID_BENCH_ROWS) {
     betaLog = betaLog.concat(watchLog);
@@ -384,19 +405,19 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
 
 /**
  * 📒 把本次 Beta 結果寫入「Beta紀錄」分頁（不存在會自動建立）
- * 版面：台股在 A~E 欄、美股在 G~K 欄（F 欄空白隔開），兩邊各自往下累積
- * 每個區塊欄位：日期、標的、1Y Beta、6M Beta、差值(1Y-6M)
+ * 版面：台股在 A~F 欄、美股在 H~M 欄、正二在 O~T 欄（G、N 欄空白隔開），各自往下累積
+ * 每個區塊欄位：日期、標的、1Y Beta、6M Beta、3M Beta、差值(1Y-6M)
  * 同一天重複刷新：只覆蓋該區塊當天的舊紀錄，只保留當天最後一次
  */
 function appendBetaLog_(ss, rows) {
   if (!rows || rows.length === 0) return;
 
   var LOG_SHEET = "Beta紀錄";
-  var BLOCK_COLS = 5;
+  var BLOCK_COLS = 6;
   var blocks = [
     { region: "台股", col: 1, title: "台股標的" },
-    { region: "美股", col: 7, title: "美股標的" },
-    { region: "正二", col: 13, title: "正二標的" }
+    { region: "美股", col: 8, title: "美股標的" },
+    { region: "正二", col: 15, title: "正二標的" }
   ];
 
   var sheet = ss.getSheetByName(LOG_SHEET);
@@ -418,7 +439,7 @@ function appendBetaLog_(ss, rows) {
   for (var h = 0; h < blocks.length; h++) {
     if (String(sheet.getRange(1, blocks[h].col).getValue()).trim() === "") {
       sheet.getRange(1, blocks[h].col, 1, BLOCK_COLS)
-        .setValues([["日期", blocks[h].title, "1Y Beta", "6M Beta", "差值(1Y-6M)"]]);
+        .setValues([["日期", blocks[h].title, "1Y Beta", "6M Beta", "3M Beta", "差值(1Y-6M)"]]);
     }
   }
   if (needInit) sheet.setFrozenRows(1);
@@ -439,7 +460,7 @@ function appendBetaLog_(ss, rows) {
 
     // 日期與代號欄用純文字（避免 00926 掉 0、日期被轉格式）；Beta 欄顯示 2 位小數
     sheet.getRange(2, blk.col, bodyRows, 2).setNumberFormat("@");
-    sheet.getRange(2, blk.col + 2, bodyRows, 3).setNumberFormat("0.00");
+    sheet.getRange(2, blk.col + 2, bodyRows, 4).setNumberFormat("0.00");
 
     // 讀出該區塊既有紀錄，去掉當天舊的，再接上本次
     var existing = sheet.getRange(2, blk.col, bodyRows, BLOCK_COLS).getValues();
@@ -455,7 +476,8 @@ function appendBetaLog_(ss, rows) {
     for (var k = 0; k < blockRows.length; k++) {
       var b1 = Number(blockRows[k][2]) || 0;
       var b6 = Number(blockRows[k][3]) || 0;
-      kept.push([today, String(blockRows[k][1]), b1, b6, Math.round((b1 - b6) * 100) / 100]);
+      var b3 = Number(blockRows[k][4]) || 0;
+      kept.push([today, String(blockRows[k][1]), b1, b6, b3, Math.round((b1 - b6) * 100) / 100]);
     }
 
     // 空間不夠就先往下加列
@@ -463,7 +485,7 @@ function appendBetaLog_(ss, rows) {
       sheet.insertRowsAfter(maxRows, kept.length - bodyRows + 200);
       var newBody = sheet.getMaxRows() - 1;
       sheet.getRange(2, blk.col, newBody, 2).setNumberFormat("@");
-      sheet.getRange(2, blk.col + 2, newBody, 3).setNumberFormat("0.00");
+      sheet.getRange(2, blk.col + 2, newBody, 4).setNumberFormat("0.00");
     }
 
     sheet.getRange(2, blk.col, bodyRows, BLOCK_COLS).clearContent();
