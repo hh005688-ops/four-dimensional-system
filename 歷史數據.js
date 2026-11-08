@@ -229,6 +229,10 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
     return n;
   }
 
+  // 拆分保護：單日報酬率超過 ±50% 幾乎一定是拆分/資料錯誤（正二最多一天漲跌約 ±20%），
+  // 這種日子不納入 Beta 計算，避免拆分日的假暴跌把 Beta 拉歪
+  var MAX_DAILY_RETURN = 0.5;
+
   function calculateSlope(stockIdx, benchIdx, startRow) {
     if (stockIdx === undefined || benchIdx === undefined) return 0;
     var sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, count = 0;
@@ -237,7 +241,8 @@ function calculateAndWriteBetaAlpha(ss, dataSheet) {
       var y = Number(rawData[r][stockIdx]);
       var x = Number(rawData[r][benchIdx]);
 
-      if (!isNaN(x) && !isNaN(y) && rawData[r][stockIdx] !== "" && rawData[r][benchIdx] !== "") {
+      if (!isNaN(x) && !isNaN(y) && rawData[r][stockIdx] !== "" && rawData[r][benchIdx] !== "" &&
+          Math.abs(x) <= MAX_DAILY_RETURN && Math.abs(y) <= MAX_DAILY_RETURN) {
         sumX += x;
         sumY += y;
         sumXY += x * y;
