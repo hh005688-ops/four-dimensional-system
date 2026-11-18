@@ -131,7 +131,8 @@ function executeDispatchUniversalLite_(sheetIdentifier, params) {
     var debtSheet = ss.getSheetByName("負債/資金");
     if (!debtSheet) return { success: false, message: "❌ 找不到『負債/資金』分頁" };
 
-    var cashCell = debtSheet.getRange("D21");
+    // 現金改寫「交割戶」H23；備用金 D21 是公式（自動遞減），這裡不寫入
+    var cashCell = debtSheet.getRange("H23");
     var currentCash = Number(cashCell.getValue()) || 0;
 
     switch (type) {
@@ -164,10 +165,8 @@ function executeDispatchUniversalLite_(sheetIdentifier, params) {
         cashCell.setValue(type === 'FUTURES_IN' ? Math.max(0, currentCash - amount) : currentCash + amount);
         break;
       case 'LOAN_PAY':
-        var periodCell = debtSheet.getRange("F" + params.row);
-        periodCell.setValue((Number(periodCell.getValue()) || 0) + 1);
-        cashCell.setValue(Math.max(0, currentCash - amount));
-        break;
+        // 備用金已由公式依已繳期數自動遞減，不再手動扣繳
+        return { success: false, message: "貸款扣繳已改為自動：備用金會依每月已繳期數自動遞減，不需要手動扣繳。" };
       case 'STOCK_BUY':
       case 'STOCK_SELL':
         var sSheet = ss.getSheetByName(params.market === 'TW' ? "台股區" : "美股區");

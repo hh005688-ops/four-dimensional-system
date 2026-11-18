@@ -78,6 +78,33 @@ function installPremiumTrigger() {
   Logger.log("✅ 已安裝：每天晚上 21:00 左右補填折溢價");
 }
 
+/**
+ * 💰 每月 1 號把「當月配息金額」（負債/資金 B23）歸零。
+ * 只動 B23；交割款/雜項（H23）、備用金等其他數字完全不受影響。
+ */
+function resetMonthlyDividend() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var debtSheet = ss.getSheetByName("負債/資金");
+  if (!debtSheet) return;
+  debtSheet.getRange("B23").setValue(0);
+}
+
+/**
+ * 🗓️ 只安裝「每月 1 號凌晨歸零當月配息」這一個排程（不會動到其他排程）
+ * 在 Apps Script 編輯器選這個函式按「執行」一次即可；重複執行只會留一個。
+ */
+function installMonthlyDividendResetTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'resetMonthlyDividend') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  ScriptApp.newTrigger('resetMonthlyDividend')
+    .timeBased().onMonthDay(1).atHour(0).nearMinute(5).create();
+  Logger.log("✅ 已安裝：每月 1 號 00:05 左右把當月配息金額歸零");
+}
+
 // ============================================================================
 // 🚀 選單／排程請直接呼叫各模組的實作函式（禁止與實作同名再自我呼叫）
 // ⚠️ 舊版曾在此定義 recordTaiwanStock(){ recordTaiwanStock(ss) }，會蓋掉

@@ -125,7 +125,8 @@ function executeDispatch(params) {
     return { success: false, message: "找不到「負債/資金」分頁！" };
   }
 
-  var cashCell = debtSheet.getRange("D21");
+  // 現金改寫「交割戶」H23；備用金 D21 是公式（自動遞減），這裡不寫入
+  var cashCell = debtSheet.getRange("H23");
   var currentCash = Number(cashCell.getValue()) || 0;
 
   // 🚀 1. 現貨買賣處理 (完全獨立的 if 判斷，絕不崩潰)
@@ -216,10 +217,8 @@ function executeDispatch(params) {
     cashCell.setValue(currentCash + amount);
   } 
   else if (type === 'LOAN_PAY') {
-    var rowLoan = Number(params.row);
-    var periodCell = debtSheet.getRange("F" + rowLoan);
-    periodCell.setValue((Number(periodCell.getValue()) || 0) + 1);
-    cashCell.setValue(Math.max(0, currentCash - amount));
+    // 備用金已由公式依已繳期數自動遞減，不再手動扣繳（避免覆蓋已繳期數公式）
+    return { success: false, message: "貸款扣繳已改為自動：備用金會依每月已繳期數自動遞減，不需要手動扣繳。" };
   }
 
   return { success: true, message: "調度成功完成！" };

@@ -36,13 +36,16 @@ function executeDispatchUniversal(sheetIdentifier, params) {
     var mainSheet = ss.getSheetByName("總覽");
     if (!debtSheet) return { success: false, message: "❌ 找不到『負債/資金』分頁" };
 
-    // 依據第二段架構：現金水庫以「負債/資金 D21」為主
-    var cashCell = debtSheet.getRange("D21");
+    // 現金架構（2026-11 起）：
+    //   備用金 D21   ＝ 公式（期初備用金 ＋ 新注入備用金 － 已繳貸款），每月自動遞減，網頁不寫入
+    //   交割戶 H23   ＝ 一般數字格，網頁的配息、買賣、期貨、質押、注入都加減這一格
+    //   總現金 D22   ＝ D21 ＋ H23；總覽 B5 ＝ D22（公式，網頁不寫入）
+    var cashCell = debtSheet.getRange("H23");
     var currentCash = Number(cashCell.getValue()) || 0;
 
-    // 同步取得總覽 B5 現金水位（若存在）
-    var mainCashCell = mainSheet ? mainSheet.getRange("B5") : null;
-    var mainCurrentCash = mainCashCell ? (Number(mainCashCell.getValue()) || 0) : 0;
+    // 總覽 B5 是公式，不再寫入（保留變數讓下方舊的 if (mainCashCell) 區塊不會執行）
+    var mainCashCell = null;
+    var mainCurrentCash = 0;
 
     var message = "";
 
@@ -53,44 +56,27 @@ function executeDispatchUniversal(sheetIdentifier, params) {
         var currentDiv = Number(divCell.getValue()) || 0;
         divCell.setValue(currentDiv + amount);
 
-        // 2. 增加現金水庫餘額 (負債/資金 D21)
+        // 2. 配息進交割戶 (負債/資金 H23)；當月配息 B23 只當記錄
         cashCell.setValue(currentCash + amount);
-        
-        // 3. 同步更新總覽分頁的現金水位 (B5)
-        if (mainCashCell) {
-          mainCashCell.setValue(mainCurrentCash + amount);
-        }
-        message = "✅ 股息入帳成功！水庫 +" + amount.toLocaleString() + " 元";
+        message = "✅ 股息入帳成功！當月配息 +" + amount.toLocaleString() + " 元，交割戶 +" + amount.toLocaleString() + " 元";
+        break;
+
+      case 'INFLOW_RESERVE':
+        // 新貸款預留到備用金：加在「新注入備用金」H22，備用金公式會自動帶入
+        var reserveCell = debtSheet.getRange("H22");
+        reserveCell.setValue((Number(reserveCell.getValue()) || 0) + amount);
+        message = "✅ 資金注入成功！備用金 +" + amount.toLocaleString() + " 元";
         break;
 
       case 'INFLOW':
+      case 'INFLOW_SETTLE':
         cashCell.setValue(currentCash + amount);
-        if (mainCashCell) {
-          mainCashCell.setValue(mainCurrentCash + amount);
-        }
-        message = "✅ 外部注水成功！水庫 +" + amount.toLocaleString() + " 元";
+        message = "✅ 資金注入成功！交割戶 +" + amount.toLocaleString() + " 元";
         break;
 
       case 'LOAN_PAY':
-        if (row < 9 || row > 17) return { success: false, message: "❌ 貸款項目列號無效" };
-        
-        // 1. 扣除水庫金額 (D21 與 總覽 B5)
-        cashCell.setValue(currentCash - amount);
-        if (mainCashCell) {
-          mainCashCell.setValue(mainCurrentCash - amount);
-        }
-        
-        // 2. 已繳期數 F 欄 (+1)
-        var curPeriod = Number(debtSheet.getRange(row, 6).getValue()) || 0;
-        debtSheet.getRange(row, 6).setValue(curPeriod + 1);
-        
-        // 3. 賸餘本金 G 欄（同步扣除本次還款金額）
-        var balanceCell = debtSheet.getRange(row, 7);
-        var currentBalance = Number(balanceCell.getValue()) || 0;
-        balanceCell.setValue(Math.max(0, currentBalance - amount));
-
-        message = "✅ 貸款扣繳成功！水庫扣除 $" + amount.toLocaleString() + "，期數推進至第 " + (curPeriod + 1) + " 期";
-        break;
+        // 備用金已由公式依已繳期數自動扣除，不再需要手動扣繳（也避免覆蓋已繳期數、剩餘本金的公式）
+        return { success: false, message: "ℹ️ 貸款扣繳已改為自動：備用金會依每月已繳期數自動遞減，不需要手動扣繳。" };
 
       case 'PLEDGE_BORROW':
         if (row < 5 || row > 7) return { success: false, message: "❌ 質押機構列號無效" };
@@ -102,7 +88,7 @@ function executeDispatchUniversal(sheetIdentifier, params) {
         
         var curBorrow = Number(debtSheet.getRange(row, 2).getValue()) || 0;
         debtSheet.getRange(row, 2).setValue(curBorrow + amount);
-        message = "⚡ 質押撥款成功！水庫 +" + amount.toLocaleString() + " 元";
+        message = "⚡ 質押撥款成功！交割戶 +" + amount.toLocaleString() + " 元";
         break;
 
       case 'PLEDGE_REPAY':
@@ -115,7 +101,7 @@ function executeDispatchUniversal(sheetIdentifier, params) {
         
         var curRepay = Number(debtSheet.getRange(row, 2).getValue()) || 0;
         debtSheet.getRange(row, 2).setValue(Math.max(0, curRepay - amount));
-        message = "🛡️ 質押還本成功！水庫扣除 $" + amount.toLocaleString() + " 元";
+        message = "🛡️ 質押還本成功！交割戶扣除 $" + amount.toLocaleString() + " 元";
         break;
 
       // 🎯 批次儲存目標佔比 (寫入 K 欄，即第 11 欄)
@@ -174,7 +160,7 @@ function executeDispatchUniversal(sheetIdentifier, params) {
           }
         }
 
-        message = "🎉 成功建立新標的 [" + market + "] " + code + "！水庫已連帶扣除 $" + cashTotal.toLocaleString() + " 元";
+        message = "🎉 成功建立新標的 [" + market + "] " + code + "！交割戶已連帶扣除 $" + cashTotal.toLocaleString() + " 元";
         break;
 
       default:
@@ -203,7 +189,7 @@ function executeStockTradeUniversal(sheetIdentifier, params) {
     if (qty <= 0) return { success: false, message: "❌ 變動股數必須大於 0" };
 
     var targetSheet = ss.getSheetByName(market === "TW" ? "台股區" : "美股區");
-    var mainSheet = ss.getSheetByName("總覽");
+    var cashSheet = ss.getSheetByName("負債/資金");
     if (!targetSheet) return { success: false, message: "❌ 找不到對應市場分頁" };
 
     var currentQty = Number(targetSheet.getRange(row, 5).getValue()) || 0;
@@ -212,10 +198,11 @@ function executeStockTradeUniversal(sheetIdentifier, params) {
 
     targetSheet.getRange(row, 5).setValue(newQty);
 
-    if (cashDiff > 0 && mainSheet) {
-      var currentCash = Number(mainSheet.getRange("B5").getValue()) || 0;
+    // 買賣現貨的資金進出在交割戶（負債/資金 H23）；總覽 B5 是公式，不寫入
+    if (cashDiff > 0 && cashSheet) {
+      var currentCash = Number(cashSheet.getRange("H23").getValue()) || 0;
       var newCash = (action === "BUY") ? (currentCash - cashDiff) : (currentCash + cashDiff);
-      mainSheet.getRange("B5").setValue(newCash);
+      cashSheet.getRange("H23").setValue(newCash);
     }
 
     var codeName = targetSheet.getRange(row, 1).getValue();
@@ -274,22 +261,22 @@ function executeFuturesTransferUniversal(sheetIdentifier, params) {
     if (amount <= 0) return { success: false, message: "❌ 金額必須大於 0" };
 
     var fSheet = ss.getSheetByName("期貨區");
-    var mainSheet = ss.getSheetByName("總覽");
-    if (!fSheet || !mainSheet) return { success: false, message: "❌ 找不到『期貨區』或『總覽』分頁" };
+    var mainSheet = ss.getSheetByName("負債/資金"); // 期貨保證金的資金進出在交割戶（H23）
+    if (!fSheet || !mainSheet) return { success: false, message: "❌ 找不到『期貨區』或『負債/資金』分頁" };
 
-    var cash = Number(mainSheet.getRange("B5").getValue()) || 0;
+    var cash = Number(mainSheet.getRange("H23").getValue()) || 0;
     var targetCell = (market === "TW") ? "B11" : "B25";
     var curMargin = Number(fSheet.getRange(targetCell).getValue()) || 0;
 
     if (action === "IN") {
-      mainSheet.getRange("B5").setValue(cash - amount);
+      mainSheet.getRange("H23").setValue(cash - amount);
       fSheet.getRange(targetCell).setValue(curMargin + amount);
-      return { success: true, message: "📥 期貨入金成功！水庫扣除 $" + amount.toLocaleString() + "，保證金本金為 $" + (curMargin + amount).toLocaleString() };
+      return { success: true, message: "📥 期貨入金成功！交割戶扣除 $" + amount.toLocaleString() + "，保證金本金為 $" + (curMargin + amount).toLocaleString() };
     } else {
       if (amount > curMargin) return { success: false, message: "❌ 出金金額大於目前保證金總入金！" };
-      mainSheet.getRange("B5").setValue(cash + amount);
+      mainSheet.getRange("H23").setValue(cash + amount);
       fSheet.getRange(targetCell).setValue(curMargin - amount);
-      return { success: true, message: "📤 期貨出金成功！水庫增加 $" + amount.toLocaleString() + "，保證金本金為 $" + (curMargin - amount).toLocaleString() };
+      return { success: true, message: "📤 期貨出金成功！交割戶增加 $" + amount.toLocaleString() + "，保證金本金為 $" + (curMargin - amount).toLocaleString() };
     }
   } catch (err) {
     return { success: false, message: "❌ 期貨回寫失敗: " + err.message };

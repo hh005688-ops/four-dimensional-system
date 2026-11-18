@@ -173,11 +173,11 @@
     <h3>💰 水庫金流與負債扣繳</h3>
     <label>金流動作：</label>
     <select id="cashActionType" onchange="renderCashSubInputs()">
-      <option value="DIVIDEND">💰 股息入帳 (增加水庫/累計配息)</option>
-      <option value="INFLOW">📥 外部注水 (薪資/資金注入)</option>
-      <option value="LOAN_PAY">💳 貸款/信貸扣繳 (扣水庫本利和)</option>
-      <option value="PLEDGE_BORROW">⚡ 券商質押借款撥款 (入水庫)</option>
-      <option value="PLEDGE_REPAY">🛡️ 券商質押還款 (扣水庫還本)</option>
+      <option value="DIVIDEND">💰 股息入帳 (進交割戶，並累計當月配息)</option>
+      <option value="INFLOW_RESERVE">📥 資金注入 → 備用金 (新貸款預留繳款)</option>
+      <option value="INFLOW_SETTLE">📥 資金注入 → 交割戶</option>
+      <option value="PLEDGE_BORROW">⚡ 券商質押借款撥款 (入交割戶)</option>
+      <option value="PLEDGE_REPAY">🛡️ 券商質押還款 (扣交割戶)</option>
     </select>
     
     <!-- 動態選單容器（適用於 貸款、質押、股息入帳） -->
