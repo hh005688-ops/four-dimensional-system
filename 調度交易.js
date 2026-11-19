@@ -112,14 +112,13 @@ function executeDispatchUniversal(sheetIdentifier, params) {
         
         updates.forEach(function(u) {
           var r = Number(u.row);
-          var val = Number(u.targetRatio) || 0;
-          var formattedVal = val > 1 ? val / 100 : val;
-          
-          if (twS && r >= 2 && r <= twS.getLastRow()) {
-            twS.getRange(r, 11).setValue(formattedVal);
-          }
-          if (usS && r >= 2 && r <= usS.getLastRow()) {
-            usS.getRange(r, 11).setValue(formattedVal);
+          // 前端傳的是百分比（例如 70 代表 70%），K 欄存小數（0.7）
+          var formattedVal = (Number(u.targetRatio) || 0) / 100;
+          // 只寫入對應市場的那一張表，避免台股/美股互相覆蓋
+          var targetS = (u.market === 'US') ? usS : (u.market === 'TW' ? twS : null);
+
+          if (targetS && r >= 2 && r <= targetS.getLastRow()) {
+            targetS.getRange(r, 11).setValue(formattedVal);
           }
         });
         message = "✅ 目標佔比已成功批次儲存至 K 欄！";

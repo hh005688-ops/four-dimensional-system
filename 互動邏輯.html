@@ -792,6 +792,7 @@ function calculateTotalDividend() {
     var updates = [];
     inputs.forEach(function(inp) {
       updates.push({
+        market: inp.getAttribute('data-market'),
         row: inp.getAttribute('data-row'),
         targetRatio: Number(inp.value) || 0
       });
