@@ -451,12 +451,12 @@
 
     <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
       <div style="display: flex; background: var(--card-sub); border: 1px solid var(--border); border-radius: 6px; padding: 2px;">
-        <button class="range-btn active" onclick="setChartRange('ALL', this)">全部</button>
-        <button class="range-btn" onclick="setChartRange('1W', this)">週</button>
-        <button class="range-btn" onclick="setChartRange('1M', this)">月</button>
-        <button class="range-btn" onclick="setChartRange('1Q', this)">季</button>
-        <button class="range-btn" onclick="setChartRange('6M', this)">半年</button>
-        <button class="range-btn" onclick="setChartRange('1Y', this)">年</button>
+        <button class="range-btn" data-range="ALL" onclick="setChartRange('ALL', this)">全部</button>
+        <button class="range-btn" data-range="1W" onclick="setChartRange('1W', this)">週</button>
+        <button class="range-btn" data-range="1M" onclick="setChartRange('1M', this)">月</button>
+        <button class="range-btn" data-range="1Q" onclick="setChartRange('1Q', this)">季</button>
+        <button class="range-btn" data-range="6M" onclick="setChartRange('6M', this)">半年</button>
+        <button class="range-btn active" data-range="1Y" onclick="setChartRange('1Y', this)">年</button>
       </div>
       
       <div style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--subtext);">

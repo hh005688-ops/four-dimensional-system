@@ -1,6 +1,7 @@
 var cachedOverviewData = null;
   var cachedStockData = null;
   var globalChartInstance = null;
+  var currentRangeType = '1Y'; // 預設顯示最近一年
   
   var rawSnapshotTables = {
     general: [],
@@ -78,6 +79,7 @@ var cachedOverviewData = null;
         rawSnapshotTables.taiwan = res.taiwan || [];
         rawSnapshotTables.us = res.us || [];
         filterCustomRange();
+        reapplyRange_();
       })
       .catch(function(err) { console.warn(err); });
   }
@@ -154,7 +156,20 @@ var cachedOverviewData = null;
     renderFilteredTables(startDate, endDate);
   }
 
+  // 以本地時間格式化 yyyy-MM-dd（避免 toISOString 在台灣時區少一天）
+  function fmtLocalDate_(d) {
+    var m = d.getMonth() + 1, day = d.getDate();
+    return d.getFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day);
+  }
+
+  // 資料載入／重畫後，重新套用目前選擇的區間（預設：年）
+  function reapplyRange_() {
+    var btn = document.querySelector('.range-btn[data-range="' + currentRangeType + '"]');
+    if (btn) setChartRange(currentRangeType, btn);
+  }
+
   function setChartRange(type, btnEl) {
+    currentRangeType = type;
     var btns = btnEl.parentNode.querySelectorAll('.range-btn');
     btns.forEach(function(b) { b.classList.remove('active'); });
     btnEl.classList.add('active');
@@ -165,6 +180,11 @@ var cachedOverviewData = null;
       dates = cachedOverviewData.dates;
     } else if (cachedStockData && cachedStockData.tw) {
       dates = cachedStockData.tw.dates;
+    }
+
+    // 圖表資料還沒到時，改用明細表格的日期，讓表格也能先套用區間
+    if ((!dates || dates.length === 0) && rawSnapshotTables.general.length > 0) {
+      dates = rawSnapshotTables.general.map(function(r) { return r.date; });
     }
 
     if (!dates || dates.length === 0) return;
@@ -191,8 +211,8 @@ var cachedOverviewData = null;
       startDate.setFullYear(lastDate.getFullYear() - 1);
     }
 
-    document.getElementById('customStartDate').value = startDate.toISOString().split('T')[0];
-    document.getElementById('customEndDate').value = lastDate.toISOString().split('T')[0];
+    document.getElementById('customStartDate').value = fmtLocalDate_(startDate);
+    document.getElementById('customEndDate').value = fmtLocalDate_(lastDate);
     renderFilteredTables(startDate, lastDate);
 
     if (globalChartInstance) {
@@ -238,6 +258,7 @@ var cachedOverviewData = null;
       ]
     };
     globalChartInstance.setOption(option);
+    reapplyRange_();
   }
 
   function renderSingleStockChart(name, dates, values, colorHex) {
@@ -265,6 +286,7 @@ var cachedOverviewData = null;
       }]
     };
     globalChartInstance.setOption(option);
+    reapplyRange_();
   }
 
   // 🏛️ 分頁切換總指揮函式
