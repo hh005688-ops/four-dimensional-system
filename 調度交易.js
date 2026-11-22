@@ -228,7 +228,7 @@ function executeStockTradeUniversal(sheetIdentifier, params) {
 
     return { 
       success: true, 
-      message: "✅ 現貨回寫完成！" + codeName + " " + (action === "BUY" ? "買進" : "賣出") + " " + qty + " 股 (最新庫存: " + newQty + " 股)" + clearedNote
+      message: "✅ 現貨回寫完成！" + codeName + " " + (action === "BUY" ? "買進" : "賣出") + " " + qty + " 股 (最新庫存: " + newQty + " 股)" + clearedNote + " [v3]"
     };
   } catch (err) {
     return { success: false, message: "❌ 現貨回寫失敗: " + err.message };
@@ -375,6 +375,28 @@ function executeFuturesPositionUniversal(sheetIdentifier, params) {
 }
 
 // 5. 新增全新股票標的
+// 保險：確認這一列的公式欄還在，被蓋掉就補回（B 名稱；台股另含 N 槓桿倍數、O 目標市值）
+function ensureStockRowFormulas_(sheet, row, market) {
+  if (market === "TW") {
+    if (!sheet.getRange(row, 2).getFormula()) {
+      sheet.getRange(row, 2).setFormula('=IFERROR(IMPORTXML(CONCATENATE("https://tw.stock.yahoo.com/quote/",A' + row + '),"//*[@id=\'main-0-QuoteHeader-Proxy\']/div/div[1]/h1"))');
+    }
+    if (!sheet.getRange(row, 14).getFormula()) {
+      sheet.getRange(row, 14).setFormula('=IF(A' + row + '="", "", IFERROR(IF(REGEXMATCH(TO_TEXT(B' + row + '), "(?i)正2|正二|2倍|2X|L$"), 2, IF(REGEXMATCH(TO_TEXT(B' + row + '), "(?i)3倍|3X"), 3, 1)), 1))');
+    }
+    if (!sheet.getRange(row, 15).getFormula()) {
+      sheet.getRange(row, 15).setFormula('=$B$10*K' + row);
+    }
+  } else {
+    if (!sheet.getRange(row, 2).getFormula()) {
+      sheet.getRange(row, 2).setFormula('=IFERROR(GOOGLEFINANCE(A' + row + ', "name"),"")');
+    }
+    if (!sheet.getRange(row, 15).getFormula()) {
+      sheet.getRange(row, 15).setFormula('=IF(A' + row + '="","",K' + row + '*$B$10)');
+    }
+  }
+}
+
 function addNewStockTargetUniversal(sheetIdentifier, params) {
   var ss = getTargetSpreadsheet_(sheetIdentifier);
   if (!ss) return { success: false, message: "❌ 無法開啟試算表" };
@@ -419,6 +441,8 @@ function addNewStockTargetUniversal(sheetIdentifier, params) {
       targetSheet.getRange(targetRow, 14).setValue(leverage);  // N 槓桿倍數（美股手填）
     }
 
+    ensureStockRowFormulas_(targetSheet, targetRow, market);
+
     // 買入總價從交割戶扣款（與現貨買賣相同：負債/資金 H23）
     var cashNote = "";
     if (cashTotal > 0) {
@@ -433,7 +457,7 @@ function addNewStockTargetUniversal(sheetIdentifier, params) {
     SpreadsheetApp.flush();
     return {
       success: true,
-      message: "🎉 成功新增標的 [" + market + "] " + code + "！(配置於第 " + targetRow + " 列)" + cashNote
+      message: "🎉 成功新增標的 [" + market + "] " + code + "！(配置於第 " + targetRow + " 列)" + cashNote + " [v3]"
     };
   } catch (err) {
     return { success: false, message: "❌ 新增標的失敗: " + err.message };
