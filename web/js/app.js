@@ -568,7 +568,9 @@ var nestPieChartInstance = null;
   function switchStockModalTab(market, row, tab) {
     var s = findStock_(market, row);
     if (!s) return;
-    var tabs = (tab === 'pledge') ? [['pledge', '質押劃撥']] : [['trade', '買賣'], ['ratio', '目標佔比']];
+    var tabs = [['trade', '買賣']];
+    if (market === 'TW') tabs.push(['pledge', '質押劃撥']);
+    tabs.push(['ratio', '目標佔比']);
     document.getElementById('stockModalTabs').innerHTML = tabs.map(function(t) {
       var on = (t[0] === tab);
       return '<button onclick="switchStockModalTab(\'' + market + '\',' + Number(row) + ',\'' + t[0] + '\')" ' +
@@ -738,19 +740,6 @@ var nestPieChartInstance = null;
                   '<div class="sub">' + subText + '</div>' +
                 '</div>' +
                 '<div class="data" style="color: var(--danger);">$' + Number(l.balance).toLocaleString() + '</div>' +
-              '</div>';
-      });
-    }
-    var twHold = ((globalData && globalData.stocks) || []).filter(function(s) { return s.market === 'TW' && isInventoryStock_(s); });
-    if (twHold.length > 0) {
-      html += '<div style="font-size:12px; color:var(--subtext); margin:12px 0 6px 0;">🔒 質押庫存劃撥（點標的可調整）</div>';
-      twHold.forEach(function(s) {
-        html += '<div class="list-item" style="cursor:pointer;" onclick="openStockModal(\'TW\',' + Number(s.row) + ',\'pledge\')">' +
-                '<div>' +
-                  '<div class="name">' + s.code + ' ' + s.name + '</div>' +
-                  '<div class="sub">質押 ' + Number(s.pledgedQty).toLocaleString() + ' 股 | 未質押 ' + Number(s.unpledgedQty).toLocaleString() + ' 股</div>' +
-                '</div>' +
-                '<div class="data" style="color: var(--primary);">›</div>' +
               '</div>';
       });
     }
