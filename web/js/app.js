@@ -503,12 +503,13 @@ var nestPieChartInstance = null;
     var box = document.getElementById('stockListContainer');
     document.getElementById('stockCount').innerText = (stocks ? stocks.length : 0) + " 檔標的";
     if (!stocks || stocks.length === 0) {
-      box.innerHTML = '<div style="text-align:center; color:var(--subtext); padding: 10px;">無持倉</div>';
+      box.innerHTML = '<div style="text-align:center; color:var(--subtext); padding: 10px;">無持倉</div>' +
+        '<button onclick="openNewStockModal()" style="margin:0; background:var(--card-sub); color:var(--text);">➕ 新增標的</button>';
       return;
     }
     var html = '';
     stocks.forEach(function(s) {
-      var subText = (s.market === 'TW') 
+      var subText = (s.market === 'TW')
         ? ('質押 ' + s.pledgedQty.toLocaleString() + ' 股 | 未質押 ' + s.unpledgedQty.toLocaleString() + ' 股')
         : ('美股折台幣 $' + Math.round(s.marketVal).toLocaleString());
       
@@ -520,7 +521,8 @@ var nestPieChartInstance = null;
               '<div class="data" style="color: var(--primary);">' + s.totalQty.toLocaleString() + ' 股 ›</div>' +
             '</div>';
     });
-    html += '<div style="text-align:center; font-size:11px; color:var(--subtext); margin-top:4px;">👆 點標的可增減庫存</div>';
+    html += '<div style="text-align:center; font-size:11px; color:var(--subtext); margin:4px 0 10px 0;">👆 點標的可增減庫存</div>';
+    html += '<button onclick="openNewStockModal()" style="margin:0; background:var(--card-sub); color:var(--text);">➕ 新增標的</button>';
     box.innerHTML = html;
   }
 
@@ -555,11 +557,124 @@ var nestPieChartInstance = null;
           '<button onclick="closeStockModal()" style="width:auto; padding:2px 10px; margin:0; font-size:18px; background:transparent; border:none; color:var(--subtext);">✕</button>' +
         '</div>' +
         '<div style="font-size:12px; color:var(--subtext); margin-bottom:12px;">目前庫存 ' + Number(s.totalQty).toLocaleString() + ' 股</div>' +
+        '<div id="stockModalTabs" style="display:flex; gap:6px; margin-bottom:12px;"></div>' +
         '<div id="stockModalBody"></div>' +
         '<div id="stockModalLoader" class="loading">⏳ 資料處理中，請稍候...</div>' +
       '</div>';
     document.body.appendChild(ov);
-    renderStockModalTrade_(s);
+    switchStockModalTab(market, row, 'trade');
+  }
+
+  // 視窗內分頁：買賣 / 質押劃撥(僅台股) / 目標佔比
+  function switchStockModalTab(market, row, tab) {
+    var s = findStock_(market, row);
+    if (!s) return;
+    var tabs = [['trade', '買賣']];
+    if (market === 'TW') tabs.push(['pledge', '質押劃撥']);
+    tabs.push(['ratio', '目標佔比']);
+    document.getElementById('stockModalTabs').innerHTML = tabs.map(function(t) {
+      var on = (t[0] === tab);
+      return '<button onclick="switchStockModalTab(\'' + market + '\',' + Number(row) + ',\'' + t[0] + '\')" ' +
+             'style="flex:1; margin:0; padding:8px; font-size:13px; ' +
+             (on ? 'background:var(--primary); color:var(--btn-text); border:none; font-weight:bold;' : '') + '">' + t[1] + '</button>';
+    }).join('');
+    if (tab === 'pledge') renderStockModalPledge_(s);
+    else if (tab === 'ratio') renderStockModalRatio_(s);
+    else renderStockModalTrade_(s);
+  }
+
+  function renderStockModalPledge_(s) {
+    document.getElementById('stockModalBody').innerHTML =
+      '<div style="font-size:12px; color:var(--subtext); margin-bottom:8px;">質押 ' + Number(s.pledgedQty).toLocaleString() + ' 股 ｜ 未質押 ' + Number(s.unpledgedQty).toLocaleString() + ' 股</div>' +
+      '<label>劃撥動作：</label>' +
+      '<select id="smPledgeAction">' +
+        '<option value="LOCK">🔒 現貨 ➔ 撥入質押庫存 (鎖定擔保品)</option>' +
+        '<option value="UNLOCK">🔓 質押庫存 ➔ 解除釋出 (轉回一般現貨)</option>' +
+      '</select>' +
+      '<label>劃撥股數：</label>' +
+      '<input type="number" id="smPledgeQty" placeholder="請輸入劃撥股數">' +
+      '<button class="btn-primary" onclick="submitStockModalPledge(' + Number(s.row) + ')">⚡ 執行質押股數劃撥</button>';
+  }
+
+  function submitStockModalPledge(row) {
+    var action = document.getElementById('smPledgeAction').value;
+    var qty = Number(document.getElementById('smPledgeQty').value || 0);
+    if (qty <= 0) return alert('⚠️ 請輸入有效劃撥股數！');
+    var loader = document.getElementById('stockModalLoader');
+    loader.style.display = 'block';
+    runDispatchAction('PLEDGE_TRANSFER', { row: row, action: action, qty: qty }, loader, function(data) {
+      alert(data.message || '執行成功');
+      closeStockModal();
+      connectSheet();
+    });
+  }
+
+  function renderStockModalRatio_(s) {
+    document.getElementById('stockModalBody').innerHTML =
+      '<label>目標佔比 (例如 10 代表 10%)：</label>' +
+      '<input type="number" id="smRatio" step="0.1" min="0" max="100" value="' + (Number(s.targetRatio) || 0) + '">' +
+      '<div style="font-size:11px; color:var(--subtext); margin:-6px 0 12px 0;">只會儲存這一檔；其他標的的佔比不變。</div>' +
+      '<button class="btn-primary" onclick="submitStockModalRatio(\'' + s.market + '\',' + Number(s.row) + ')">💾 儲存目標佔比</button>';
+  }
+
+  function submitStockModalRatio(market, row) {
+    var ratio = Number(document.getElementById('smRatio').value);
+    if (isNaN(ratio) || ratio < 0 || ratio > 100) return alert('⚠️ 目標佔比請輸入 0 到 100');
+    var loader = document.getElementById('stockModalLoader');
+    loader.style.display = 'block';
+    runDispatchAction('BATCH_SAVE_TARGET_RATIOS', { updates: [{ market: market, row: row, targetRatio: ratio }] }, loader, function(data) {
+      alert(data.message || '目標佔比已儲存');
+      closeStockModal();
+      connectSheet();
+    }, '❌ 儲存失敗: ');
+  }
+
+  // ===== 新增標的（從總覽清單進入）=====
+  function openNewStockModal() {
+    closeStockModal();
+    var ov = document.createElement('div');
+    ov.id = 'stockModalOverlay';
+    ov.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.55); z-index:300; display:flex; align-items:flex-end; justify-content:center;';
+    ov.onclick = function(e) { if (e.target === ov) closeStockModal(); };
+    ov.innerHTML =
+      '<div style="width:100%; max-width:480px; max-height:88vh; overflow-y:auto; background:var(--card-bg); border:1px solid var(--border); border-radius:16px 16px 0 0; padding:16px;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">' +
+          '<h3 style="margin:0; font-size:16px;">➕ 新增標的</h3>' +
+          '<button onclick="closeStockModal()" style="width:auto; padding:2px 10px; margin:0; font-size:18px; background:transparent; border:none; color:var(--subtext);">✕</button>' +
+        '</div>' +
+        '<label>市場別：</label>' +
+        '<select id="smNewMarket">' +
+          '<option value="TW">🇹🇼 台灣市場 (台股 / ETF)</option>' +
+          '<option value="US">🇺🇸 美國市場 (美股 / ETF)</option>' +
+        '</select>' +
+        '<label>股票代碼 (例: 00631L 或 TQQQ)：</label>' +
+        '<input type="text" id="smNewCode" placeholder="輸入代碼後試算表將自動帶入名稱">' +
+        '<label>買入股數：</label>' +
+        '<input type="number" id="smNewQty" placeholder="0">' +
+        '<label>買入總價 (NTD，自動扣除現金水庫)：</label>' +
+        '<input type="number" id="smNewCash" value="0">' +
+        '<label>目標佔比 (例如 10 代表 10%)：</label>' +
+        '<input type="number" id="smNewRatio" placeholder="10">' +
+        '<button class="btn-primary" onclick="submitNewStockModal()">✨ 建立並初始化標的</button>' +
+        '<div id="stockModalLoader" class="loading">⏳ 資料處理中，請稍候...</div>' +
+      '</div>';
+    document.body.appendChild(ov);
+  }
+
+  function submitNewStockModal() {
+    var market = document.getElementById('smNewMarket').value;
+    var code = document.getElementById('smNewCode').value.trim();
+    var qty = Number(document.getElementById('smNewQty').value || 0);
+    var cashTotal = Number(document.getElementById('smNewCash').value || 0);
+    var ratio = Number(document.getElementById('smNewRatio').value || 0);
+    if (!code) return alert('⚠️ 請輸入股票代碼！');
+    var loader = document.getElementById('stockModalLoader');
+    loader.style.display = 'block';
+    runDispatchAction('ADD_STOCK', { market: market, code: code, qty: qty, cashTotal: cashTotal, targetRatio: ratio }, loader, function(data) {
+      alert(data.message || '建立並初始化完成');
+      closeStockModal();
+      connectSheet();
+    });
   }
 
   function renderStockModalTrade_(s) {
