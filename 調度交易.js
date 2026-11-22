@@ -206,13 +206,15 @@ function executeStockTradeUniversal(sheetIdentifier, params) {
     // 賣到 0 股：自動清空這一列的輸入欄位，讓格子空出來，之後可用「新增標的」重新建立
     var clearedNote = "";
     if (newQty === 0) {
+      // 只清「手填／腳本寫入」的格子；B 名稱、F~H、J、N(台)、O 等是公式，一律不碰
       targetSheet.getRange(row, 1).clearContent();   // A 代碼
-      targetSheet.getRange(row, 11).clearContent();  // K 目標佔比
+      targetSheet.getRange(row, 11).clearContent();  // K 目標占比
+      targetSheet.getRange(row, 12).clearContent();  // L beta值（腳本寫入）
       if (market === "TW") {
-        targetSheet.getRange(row, 13).setValue(0);   // M 質押
-        targetSheet.getRange(row, 15).clearContent(); // O
+        targetSheet.getRange(row, 9).setValue(0);    // I 質押股數
+        targetSheet.getRange(row, 13).clearContent(); // M 加權beta值（腳本寫入）
       } else {
-        targetSheet.getRange(row, 14).clearContent(); // N
+        targetSheet.getRange(row, 14).setValue(1);   // N 槓桿倍數（美股手填，預設 1）
       }
       clearedNote = "（已賣光，這一列已自動清空）";
     }
@@ -380,12 +382,12 @@ function addNewStockTargetUniversal(sheetIdentifier, params) {
   try {
     var market = params.market;
     var code = String(params.code).trim().toUpperCase();
-    var name = String(params.name).trim();
     var qty = Number(params.qty) || 0;
-    var targetRatio = Number(params.targetRatio) || 0;
+    var cashTotal = Number(params.cashTotal) || 0;
+    var targetRatio = Number(params.targetRatio) || 0;   // 網頁傳的是百分比（10 代表 10%）
     var leverage = Number(params.leverage) || 1;
 
-    if (!code || !name) return { success: false, message: "❌ 股票代碼與名稱不得為空！" };
+    if (!code) return { success: false, message: "❌ 股票代碼不得為空！" };
 
     var targetSheet = ss.getSheetByName(market === "TW" ? "台股區" : "美股區");
     if (!targetSheet) return { success: false, message: "❌ 找不到對應市場分頁" };
@@ -407,23 +409,31 @@ function addNewStockTargetUniversal(sheetIdentifier, params) {
       return { success: false, message: "❌ 持倉插槽已滿（上限 6 檔），請先清理閒置標的！" };
     }
 
+    // 只寫手填欄位：A 代碼、E 庫存、K 目標占比；B 名稱是公式會自動帶入，千萬不要覆蓋
     targetSheet.getRange(targetRow, 1).setValue(code);
-    targetSheet.getRange(targetRow, 2).setValue(name);
     targetSheet.getRange(targetRow, 5).setValue(qty);
-    
+    targetSheet.getRange(targetRow, 11).setValue(targetRatio / 100);
     if (market === "TW") {
-      targetSheet.getRange(targetRow, 9).setValue(0);
-      targetSheet.getRange(targetRow, 11).setValue(targetRatio > 1 ? targetRatio / 100 : targetRatio);
-      targetSheet.getRange(targetRow, 14).setValue(leverage);
+      targetSheet.getRange(targetRow, 9).setValue(0);          // I 質押股數（N 槓桿倍數是公式，不寫）
     } else {
-      targetSheet.getRange(targetRow, 10).setValue(targetRatio > 1 ? targetRatio / 100 : targetRatio);
-      targetSheet.getRange(targetRow, 13).setValue(leverage);
+      targetSheet.getRange(targetRow, 14).setValue(leverage);  // N 槓桿倍數（美股手填）
+    }
+
+    // 買入總價從交割戶扣款（與現貨買賣相同：負債/資金 H23）
+    var cashNote = "";
+    if (cashTotal > 0) {
+      var cashSheet = ss.getSheetByName("負債/資金");
+      if (cashSheet) {
+        var curCash = Number(cashSheet.getRange("H23").getValue()) || 0;
+        cashSheet.getRange("H23").setValue(curCash - cashTotal);
+        cashNote = " 交割款已扣除 $" + cashTotal.toLocaleString();
+      }
     }
 
     SpreadsheetApp.flush();
     return {
       success: true,
-      message: "🎉 成功新增標的 [" + market + "] " + code + " " + name + "！(配置於第 " + targetRow + " 列)"
+      message: "🎉 成功新增標的 [" + market + "] " + code + "！(配置於第 " + targetRow + " 列)" + cashNote
     };
   } catch (err) {
     return { success: false, message: "❌ 新增標的失敗: " + err.message };
