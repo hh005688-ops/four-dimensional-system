@@ -693,6 +693,10 @@ var nestPieChartInstance = null;
     var qty = Number(document.getElementById('smQty').value || 0);
     var cashDiff = Number(document.getElementById('smCash').value || 0);
     if (qty <= 0) return alert('⚠️ 請輸入有效變動股數！');
+    var cur = findStock_(market, row);
+    if (action === 'SELL' && cur && qty >= Number(cur.totalQty)) {
+      if (!confirm('這筆賣出會讓 ' + cur.code + ' 變成 0 股，試算表會自動把這一列清空（代碼與目標佔比都會移除）。要繼續嗎？')) return;
+    }
 
     var loader = document.getElementById('stockModalLoader');
     loader.style.display = 'block';
@@ -911,6 +915,7 @@ function calculateTotalDividend() {
   function renderExistingStocksRatioInputs(stocks) {
     var twContainer = document.getElementById('twStocksRatioContainer');
     var usContainer = document.getElementById('usStocksRatioContainer');
+    if (!twContainer || !usContainer) return;
 
     var twStocks = (stocks || []).filter(function(s){ return s.market === 'TW'; });
     var usStocks = (stocks || []).filter(function(s){ return s.market === 'US'; });

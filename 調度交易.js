@@ -138,6 +138,11 @@ function executeDispatchUniversal(sheetIdentifier, params) {
         var lastR = Math.max(targetSheet.getLastRow(), 7);
         var aValues = targetSheet.getRange("A2:A" + lastR).getValues();
         var targetRow = -1;
+        for (var dupIdx = 0; dupIdx < aValues.length; dupIdx++) {
+          if (String(aValues[dupIdx][0]).trim().toUpperCase() === code) {
+            return { success: false, message: "⚠️ " + code + " 已經在持倉裡了，請從資金權重清單點它做買進。" };
+          }
+        }
         for (var idx = 0; idx < aValues.length; idx++) {
           if (!String(aValues[idx][0]).trim()) {
             targetRow = idx + 2;
@@ -195,7 +200,22 @@ function executeStockTradeUniversal(sheetIdentifier, params) {
     var newQty = (action === "BUY") ? (currentQty + qty) : (currentQty - qty);
     if (newQty < 0) return { success: false, message: "❌ 庫存不足，無法賣出！" };
 
+    var codeName = targetSheet.getRange(row, 1).getValue();
     targetSheet.getRange(row, 5).setValue(newQty);
+
+    // 賣到 0 股：自動清空這一列的輸入欄位，讓格子空出來，之後可用「新增標的」重新建立
+    var clearedNote = "";
+    if (newQty === 0) {
+      targetSheet.getRange(row, 1).clearContent();   // A 代碼
+      targetSheet.getRange(row, 11).clearContent();  // K 目標佔比
+      if (market === "TW") {
+        targetSheet.getRange(row, 13).setValue(0);   // M 質押
+        targetSheet.getRange(row, 15).clearContent(); // O
+      } else {
+        targetSheet.getRange(row, 14).clearContent(); // N
+      }
+      clearedNote = "（已賣光，這一列已自動清空）";
+    }
 
     // 買賣現貨的資金進出在交割戶（負債/資金 H23）；總覽 B5 是公式，不寫入
     if (cashDiff > 0 && cashSheet) {
@@ -204,10 +224,9 @@ function executeStockTradeUniversal(sheetIdentifier, params) {
       cashSheet.getRange("H23").setValue(newCash);
     }
 
-    var codeName = targetSheet.getRange(row, 1).getValue();
     return { 
       success: true, 
-      message: "✅ 現貨回寫完成！" + codeName + " " + (action === "BUY" ? "買進" : "賣出") + " " + qty + " 股 (最新庫存: " + newQty + " 股)" 
+      message: "✅ 現貨回寫完成！" + codeName + " " + (action === "BUY" ? "買進" : "賣出") + " " + qty + " 股 (最新庫存: " + newQty + " 股)" + clearedNote
     };
   } catch (err) {
     return { success: false, message: "❌ 現貨回寫失敗: " + err.message };
