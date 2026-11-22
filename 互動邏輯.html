@@ -296,6 +296,8 @@
               '</div>' +
             '</div>';
 
+    html += '<div style="text-align:center; font-size:11px; color:var(--subtext); margin:10px 0;">👆 點標的可增減庫存、調整目標佔比</div>';
+    html += '<button onclick="openNewStockModal()" style="margin:0; background:var(--card-sub); color:var(--text);">➕ 新增標的</button>';
     box.innerHTML = html;
   }
 
@@ -483,7 +485,7 @@
         ? '<span style="font-size:11px; color:var(--subtext); margin-left:6px;">目標 ' + target.toFixed(1) + '%</span>'
         : '';
 
-      return '<div style="margin-bottom: 10px;">' +
+      return '<div style="margin-bottom: 10px; cursor:pointer;" onclick="openStockModal(\'' + s.market + '\',' + Number(s.row) + ')">' +
                '<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px; gap:8px;">' +
                  '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + color + ';margin-right:6px;vertical-align:middle;"></span>' + s.code + ' ' + s.name + targetHtml + '</span>' +
                  '<span style="color:' + color + '; font-weight:bold; white-space:nowrap;">$' + Math.round(mVal).toLocaleString() + ' (' + ratio + '%)</span>' +
@@ -504,8 +506,7 @@
     var box = document.getElementById('stockListContainer');
     document.getElementById('stockCount').innerText = (stocks ? stocks.length : 0) + " 檔標的";
     if (!stocks || stocks.length === 0) {
-      box.innerHTML = '<div style="text-align:center; color:var(--subtext); padding: 10px;">無持倉</div>' +
-        '<button onclick="openNewStockModal()" style="margin:0; background:var(--card-sub); color:var(--text);">➕ 新增標的</button>';
+      box.innerHTML = '<div style="text-align:center; color:var(--subtext); padding: 10px;">無持倉</div>';
       return;
     }
     var html = '';
@@ -514,16 +515,14 @@
         ? ('質押 ' + s.pledgedQty.toLocaleString() + ' 股 | 未質押 ' + s.unpledgedQty.toLocaleString() + ' 股')
         : ('美股折台幣 $' + Math.round(s.marketVal).toLocaleString());
       
-      html += '<div class="list-item" style="cursor:pointer;" onclick="openStockModal(\'' + s.market + '\',' + Number(s.row) + ')">' +
+      html += '<div class="list-item">' +
               '<div>' +
                 '<div class="name">[' + s.market + '] ' + s.code + ' ' + s.name + '</div>' +
                 '<div class="sub">' + subText + '</div>' +
               '</div>' +
-              '<div class="data" style="color: var(--primary);">' + s.totalQty.toLocaleString() + ' 股 ›</div>' +
+              '<div class="data" style="color: var(--primary);">' + s.totalQty.toLocaleString() + ' 股</div>' +
             '</div>';
     });
-    html += '<div style="text-align:center; font-size:11px; color:var(--subtext); margin:4px 0 10px 0;">👆 點標的可增減庫存</div>';
-    html += '<button onclick="openNewStockModal()" style="margin:0; background:var(--card-sub); color:var(--text);">➕ 新增標的</button>';
     box.innerHTML = html;
   }
 
@@ -541,7 +540,7 @@
     if (el && el.parentNode) el.parentNode.removeChild(el);
   }
 
-  function openStockModal(market, row) {
+  function openStockModal(market, row, mode) {
     var s = findStock_(market, row);
     if (!s) return alert('⚠️ 找不到這檔標的，請重新整理後再試');
     closeStockModal();
@@ -563,16 +562,14 @@
         '<div id="stockModalLoader" class="loading">⏳ 資料處理中，請稍候...</div>' +
       '</div>';
     document.body.appendChild(ov);
-    switchStockModalTab(market, row, 'trade');
+    switchStockModalTab(market, row, mode === 'pledge' ? 'pledge' : 'trade');
   }
 
   // 視窗內分頁：買賣 / 質押劃撥(僅台股) / 目標佔比
   function switchStockModalTab(market, row, tab) {
     var s = findStock_(market, row);
     if (!s) return;
-    var tabs = [['trade', '買賣']];
-    if (market === 'TW') tabs.push(['pledge', '質押劃撥']);
-    tabs.push(['ratio', '目標佔比']);
+    var tabs = (tab === 'pledge') ? [['pledge', '質押劃撥']] : [['trade', '買賣'], ['ratio', '目標佔比']];
     document.getElementById('stockModalTabs').innerHTML = tabs.map(function(t) {
       var on = (t[0] === tab);
       return '<button onclick="switchStockModalTab(\'' + market + '\',' + Number(row) + ',\'' + t[0] + '\')" ' +
@@ -738,6 +735,19 @@
                   '<div class="sub">' + subText + '</div>' +
                 '</div>' +
                 '<div class="data" style="color: var(--danger);">$' + Number(l.balance).toLocaleString() + '</div>' +
+              '</div>';
+      });
+    }
+    var twHold = ((globalData && globalData.stocks) || []).filter(function(s) { return s.market === 'TW' && isInventoryStock_(s); });
+    if (twHold.length > 0) {
+      html += '<div style="font-size:12px; color:var(--subtext); margin:12px 0 6px 0;">🔒 質押庫存劃撥（點標的可調整）</div>';
+      twHold.forEach(function(s) {
+        html += '<div class="list-item" style="cursor:pointer;" onclick="openStockModal(\'TW\',' + Number(s.row) + ',\'pledge\')">' +
+                '<div>' +
+                  '<div class="name">' + s.code + ' ' + s.name + '</div>' +
+                  '<div class="sub">質押 ' + Number(s.pledgedQty).toLocaleString() + ' 股 | 未質押 ' + Number(s.unpledgedQty).toLocaleString() + ' 股</div>' +
+                '</div>' +
+                '<div class="data" style="color: var(--primary);">›</div>' +
               '</div>';
       });
     }
