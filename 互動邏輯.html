@@ -515,14 +515,18 @@
         ? ('質押 ' + s.pledgedQty.toLocaleString() + ' 股 | 未質押 ' + s.unpledgedQty.toLocaleString() + ' 股')
         : ('美股折台幣 $' + Math.round(s.marketVal).toLocaleString());
       
-      html += '<div class="list-item">' +
+      var isTW = (s.market === 'TW');
+      html += '<div class="list-item"' + (isTW ? ' style="cursor:pointer;" onclick="openStockModal(\'TW\',' + Number(s.row) + ',\'pledge\')"' : '') + '>' +
               '<div>' +
                 '<div class="name">[' + s.market + '] ' + s.code + ' ' + s.name + '</div>' +
                 '<div class="sub">' + subText + '</div>' +
               '</div>' +
-              '<div class="data" style="color: var(--primary);">' + s.totalQty.toLocaleString() + ' 股</div>' +
+              '<div class="data" style="color: var(--primary);">' + s.totalQty.toLocaleString() + ' 股' + (isTW ? ' ›' : '') + '</div>' +
             '</div>';
     });
+    if (stocks.some(function(x) { return x.market === 'TW'; })) {
+      html += '<div style="text-align:center; font-size:11px; color:var(--subtext); margin-top:4px;">👆 點台股標的可做質押劃撥</div>';
+    }
     box.innerHTML = html;
   }
 
@@ -569,9 +573,7 @@
   function switchStockModalTab(market, row, tab) {
     var s = findStock_(market, row);
     if (!s) return;
-    var tabs = [['trade', '買賣']];
-    if (market === 'TW') tabs.push(['pledge', '質押劃撥']);
-    tabs.push(['ratio', '目標佔比']);
+    var tabs = (tab === 'pledge') ? [['pledge', '質押劃撥']] : [['trade', '買賣'], ['ratio', '目標佔比']];
     document.getElementById('stockModalTabs').innerHTML = tabs.map(function(t) {
       var on = (t[0] === tab);
       return '<button onclick="switchStockModalTab(\'' + market + '\',' + Number(row) + ',\'' + t[0] + '\')" ' +
