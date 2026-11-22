@@ -512,15 +512,83 @@ var nestPieChartInstance = null;
         ? ('質押 ' + s.pledgedQty.toLocaleString() + ' 股 | 未質押 ' + s.unpledgedQty.toLocaleString() + ' 股')
         : ('美股折台幣 $' + Math.round(s.marketVal).toLocaleString());
       
-      html += '<div class="list-item">' +
+      html += '<div class="list-item" style="cursor:pointer;" onclick="openStockModal(\'' + s.market + '\',' + Number(s.row) + ')">' +
               '<div>' +
                 '<div class="name">[' + s.market + '] ' + s.code + ' ' + s.name + '</div>' +
                 '<div class="sub">' + subText + '</div>' +
               '</div>' +
-              '<div class="data" style="color: var(--primary);">' + s.totalQty.toLocaleString() + ' 股</div>' +
+              '<div class="data" style="color: var(--primary);">' + s.totalQty.toLocaleString() + ' 股 ›</div>' +
             '</div>';
     });
+    html += '<div style="text-align:center; font-size:11px; color:var(--subtext); margin-top:4px;">👆 點標的可增減庫存</div>';
     box.innerHTML = html;
+  }
+
+  // ===== 點總覽標的 → 彈出視窗（買進/賣出）=====
+  function findStock_(market, row) {
+    var list = (globalData && globalData.stocks) || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].market === market && String(list[i].row) === String(row)) return list[i];
+    }
+    return null;
+  }
+
+  function closeStockModal() {
+    var el = document.getElementById('stockModalOverlay');
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+  }
+
+  function openStockModal(market, row) {
+    var s = findStock_(market, row);
+    if (!s) return alert('⚠️ 找不到這檔標的，請重新整理後再試');
+    closeStockModal();
+
+    var ov = document.createElement('div');
+    ov.id = 'stockModalOverlay';
+    ov.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.55); z-index:300; display:flex; align-items:flex-end; justify-content:center;';
+    ov.onclick = function(e) { if (e.target === ov) closeStockModal(); };
+
+    ov.innerHTML =
+      '<div style="width:100%; max-width:480px; max-height:88vh; overflow-y:auto; background:var(--card-bg); border:1px solid var(--border); border-radius:16px 16px 0 0; padding:16px;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">' +
+          '<h3 style="margin:0; font-size:16px;">[' + s.market + '] ' + s.code + ' ' + s.name + '</h3>' +
+          '<button onclick="closeStockModal()" style="width:auto; padding:2px 10px; margin:0; font-size:18px; background:transparent; border:none; color:var(--subtext);">✕</button>' +
+        '</div>' +
+        '<div style="font-size:12px; color:var(--subtext); margin-bottom:12px;">目前庫存 ' + Number(s.totalQty).toLocaleString() + ' 股</div>' +
+        '<div id="stockModalBody"></div>' +
+        '<div id="stockModalLoader" class="loading">⏳ 資料處理中，請稍候...</div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    renderStockModalTrade_(s);
+  }
+
+  function renderStockModalTrade_(s) {
+    document.getElementById('stockModalBody').innerHTML =
+      '<label>動作：</label>' +
+      '<select id="smAction">' +
+        '<option value="BUY">📈 買進 (增加股數)</option>' +
+        '<option value="SELL">📉 賣出 (減少股數)</option>' +
+      '</select>' +
+      '<label>變動股數：</label>' +
+      '<input type="number" id="smQty" placeholder="請輸入股數">' +
+      '<label>連帶動用水庫金額 (NTD，不變動填 0)：</label>' +
+      '<input type="number" id="smCash" value="0">' +
+      '<button class="btn-primary" onclick="submitStockModalTrade(\'' + s.market + '\',' + Number(s.row) + ')">🚀 確認現貨回寫</button>';
+  }
+
+  function submitStockModalTrade(market, row) {
+    var action = document.getElementById('smAction').value;
+    var qty = Number(document.getElementById('smQty').value || 0);
+    var cashDiff = Number(document.getElementById('smCash').value || 0);
+    if (qty <= 0) return alert('⚠️ 請輸入有效變動股數！');
+
+    var loader = document.getElementById('stockModalLoader');
+    loader.style.display = 'block';
+    runDispatchAction('STOCK_TRADE', { market: market, row: row, action: action, qty: qty, cashDiff: cashDiff }, loader, function(data) {
+      alert(data.message || '執行成功');
+      closeStockModal();
+      connectSheet();
+    });
   }
 
   function renderFutures(fut) {
